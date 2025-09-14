@@ -42,6 +42,8 @@ export default function ChatWindow({ conversation, onSendMessage }) {
 
   const getAvatar = (name) => `https://placehold.co/100x100/7B46E4/FFFFFF?text=${name.charAt(0).toUpperCase()}`;
 
+  let lastMessageDate = null;
+
   return (
     <div className="flex-grow flex flex-col bg-gray-100">
       <header className="flex items-center p-3 bg-white border-b border-gray-200 shadow-sm">
@@ -50,15 +52,35 @@ export default function ChatWindow({ conversation, onSendMessage }) {
       </header>
 
       <div className="flex-grow p-6 overflow-y-auto bg-cover bg-center" style={{ backgroundImage: "url('https://i.pinimg.com/736x/8c/98/99/8c98994518b575bfd8c949e91d20548b.jpg')" }}>
-        <div className="flex flex-col space-y-4">
-          {conversation.messages.map((msg, index) => (
-            <div key={index} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
-              <div className={`rounded-xl px-4 py-2 max-w-lg shadow-md ${msg.sender === 'user' ? 'bg-green-100 text-gray-800' : 'bg-white text-gray-800'}`}>
-                <p className="whitespace-pre-wrap text-sm">{msg.text}</p>
-                <span className="text-xs text-gray-400 float-right mt-1 ml-2">{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-              </div>
-            </div>
-          ))}
+        <div className="flex flex-col space-y-2">
+          {conversation.messages.map((msg, index) => {
+            const messageDate = new Date(msg.timestamp);
+            const currentDateStr = messageDate.toLocaleDateString('pt-BR', { year: 'numeric', month: '2-digit', day: '2-digit' });
+            let dateDivider = null;
+
+            if (currentDateStr !== lastMessageDate) {
+              dateDivider = (
+                <div key={`date-${index}`} className="flex justify-center my-3">
+                  <span className="bg-white bg-opacity-90 text-gray-600 text-xs font-semibold px-3 py-1 rounded-lg shadow-sm">
+                    {currentDateStr}
+                  </span>
+                </div>
+              );
+              lastMessageDate = currentDateStr;
+            }
+
+            return (
+              <React.Fragment key={index}>
+                {dateDivider}
+                <div className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
+                  <div className={`rounded-xl px-4 py-2 max-w-lg shadow-md ${msg.sender === 'user' ? 'bg-green-100 text-gray-800' : 'bg-white text-gray-800'}`}>
+                    <p className="whitespace-pre-wrap text-sm">{msg.text}</p>
+                    <span className="text-xs text-gray-400 float-right mt-1 ml-2">{messageDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                  </div>
+                </div>
+              </React.Fragment>
+            );
+          })}
           <div ref={messagesEndRef} />
         </div>
       </div>
@@ -81,4 +103,3 @@ export default function ChatWindow({ conversation, onSendMessage }) {
     </div>
   );
 }
-
