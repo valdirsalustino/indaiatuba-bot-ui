@@ -55,7 +55,7 @@ export default function ChatWindow({ conversation, onSendMessage }) {
             <div key={index} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
               <div className={`rounded-xl px-4 py-2 max-w-lg shadow-md ${msg.sender === 'user' ? 'bg-green-100 text-gray-800' : 'bg-white text-gray-800'}`}>
                 <p className="whitespace-pre-wrap text-sm">{msg.text}</p>
-                <span className="text-xs text-gray-400 float-right mt-1 ml-2">{new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                <span className="text-xs text-gray-400 float-right mt-1 ml-2">{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
               </div>
             </div>
           ))}
