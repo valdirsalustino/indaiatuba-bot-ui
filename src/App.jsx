@@ -44,7 +44,8 @@ function App() {
     ws.onmessage = (event) => {
       const data = JSON.parse(event.data);
       if (data.update === 'new_handoff_request') {
-        console.log('New handoff request received!');
+        const data = JSON.parse(event.data);
+        console.log('New handoff request received: ', data);
         fetchConversations(); // Re-fetch conversations to show the new request
       }
     };

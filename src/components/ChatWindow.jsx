@@ -1,11 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-
-const UserIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="h-12 w-12 text-gray-400">
-    <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"></path>
-    <circle cx="12" cy="7" r="4"></circle>
-  </svg>
-);
+import UserIcon from './UserIcon'; // This now correctly imports the one and only UserIcon
 
 const SendIcon = () => (
   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6">
@@ -33,21 +27,24 @@ export default function ChatWindow({ conversation, onSendMessage }) {
     return (
       <div className="flex-grow flex items-center justify-center bg-gray-50">
         <div className="text-center text-gray-500">
-          <UserIcon />
+           {/* Now uses the correct imported UserIcon */}
+          <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center mx-auto mb-2">
+            <UserIcon className="h-10 w-10 text-gray-400" />
+          </div>
           <p className="mt-2 text-lg">Select a conversation to start chatting</p>
         </div>
       </div>
     );
   }
 
-  const getAvatar = (name) => `https://placehold.co/100x100/7B46E4/FFFFFF?text=${name.charAt(0).toUpperCase()}`;
-
   let lastMessageDate = null;
 
   return (
     <div className="flex-grow flex flex-col bg-gray-100">
       <header className="flex items-center p-3 bg-white border-b border-gray-200 shadow-sm">
-         <img src={getAvatar(conversation.thread_id)} alt={conversation.thread_id} className="w-10 h-10 rounded-full mr-3" />
+         <div className="w-10 h-10 rounded-full mr-3 flex items-center justify-center bg-gray-200 flex-shrink-0">
+            <UserIcon className="h-6 w-6 text-gray-500" />
+         </div>
          <h2 className="font-semibold text-gray-800">{conversation.thread_id}</h2>
       </header>
 
@@ -55,7 +52,7 @@ export default function ChatWindow({ conversation, onSendMessage }) {
         <div className="flex flex-col space-y-2">
           {conversation.messages.map((msg, index) => {
             const messageDate = new Date(msg.timestamp);
-            const currentDateStr = messageDate.toLocaleDateString('pt-BR', { year: 'numeric', month: '2-digit', day: '2-digit' });
+            const currentDateStr = messageDate.toLocaleString('pt-BR', { year: 'numeric', month: '2-digit', day: '2-digit' });
             let dateDivider = null;
 
             if (currentDateStr !== lastMessageDate) {
