@@ -45,9 +45,18 @@ function App() {
       const data = JSON.parse(event.data);
       if (data.update === 'new_handoff_request') {
         const data = JSON.parse(event.data);
-        console.log('New handoff request received: ', data);
-        fetchConversations(); // Re-fetch conversations to show the new request
+        console.log('New handoff request received!');
+        // TODO: when the user request handoff alert the human assistant in the panel by adding the logo
+        // Highlight message that require human assistant
+        fetchConversations();
+        // highlight_message(event.data.phone_number);
       }
+      if (data.update === 'new_message') {
+        const data = JSON.parse(event.data);
+        console.log('New message received!');
+        fetchConversations();
+      }
+
     };
     ws.onclose = () => console.log('WebSocket disconnected');
     ws.onerror = (err) => console.error('WebSocket error:', err);
