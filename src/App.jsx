@@ -13,6 +13,8 @@ function App() {
   const [selectedConversation, setSelectedConversation] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [anyNeedsAttention, setAnyNeedsAttention] = useState(false);
+
 
   const fetchConversations = useCallback(async () => {
     if (!token) return;
@@ -25,6 +27,12 @@ function App() {
       if (!response.ok) throw new Error('Failed to fetch conversations.');
       const data = await response.json();
       setConversations(data);
+      // Check if any conversation has a message needing human supervision
+      const needsAttention = data.some(conv =>
+        conv.messages.some(msg => msg.human_supervision === true)
+      );
+      setAnyNeedsAttention(needsAttention);
+
     } catch (err) {
       setError(err.message);
     } finally {
@@ -43,8 +51,8 @@ function App() {
     ws.onopen = () => console.log('WebSocket connected');
     ws.onmessage = (event) => {
       const data = JSON.parse(event.data);
-      if (data.update === 'new_handoff_request') {
-        console.log('New handoff request received!');
+      if (data.update === 'new_handoff_request' || data.update === 'new_message') {
+        console.log('New data received: ', data);
         fetchConversations(); // Re-fetch conversations to show the new request
       }
     };
@@ -53,6 +61,17 @@ function App() {
 
     return () => ws.close();
   }, [token, fetchConversations]);
+
+  useEffect(() => {
+    if (selectedConversation?.thread_id) {
+      const updatedConversation = conversations.find(
+        (conv) => conv.thread_id === selectedConversation.thread_id
+      );
+      if (updatedConversation) {
+        setSelectedConversation(updatedConversation);
+      }
+    }
+  }, [conversations, selectedConversation?.thread_id]);
 
   const handleLogin = (newToken) => {
     localStorage.setItem('admin_token', newToken);
@@ -67,15 +86,13 @@ function App() {
   };
 
   const handleSelectConversation = (conversation) => {
-    // The full conversation object (including messages) is already fetched
-    // by the /conversations endpoint in our current backend implementation.
     setSelectedConversation(conversation);
   };
 
   const handleSendMessage = async (text) => {
     if (!selectedConversation) return;
 
-    const optimisticMessage = { sender: 'admin', text };
+    const optimisticMessage = { sender: 'admin', text, timestamp: new Date().toISOString() };
     setSelectedConversation(prev => ({
         ...prev,
         messages: [...prev.messages, optimisticMessage]
@@ -90,15 +107,27 @@ function App() {
             },
             body: JSON.stringify({ text }),
         });
-        // Optionally re-fetch conversations to get the latest state
         fetchConversations();
     } catch (err) {
         setError("Failed to send message.");
-        // Revert optimistic update on failure
         setSelectedConversation(prev => ({
             ...prev,
             messages: prev.messages.slice(0, -1)
         }));
+    }
+  };
+
+  const handleMarkAsSolved = async (thread_id) => {
+    try {
+        await fetch(`${API_BASE_URL}/conversations/${thread_id}/resolve`, {
+            method: 'POST', // Or 'PUT', depending on your API design
+            headers: {
+                'Authorization': `Bearer ${token}`,
+            },
+        });
+        fetchConversations(); // Refresh the list
+    } catch (err) {
+        setError("Failed to mark as solved.");
     }
   };
 
@@ -115,10 +144,12 @@ function App() {
           onSelect={handleSelectConversation}
           selectedId={selectedConversation?.thread_id}
           onLogout={handleLogout}
+          anyNeedsAttention={anyNeedsAttention}
         />
         <ChatWindow
           conversation={selectedConversation}
           onSendMessage={handleSendMessage}
+          onMarkAsSolved={handleMarkAsSolved}
         />
       </div>
     </div>
@@ -126,4 +157,3 @@ function App() {
 }
 
 export default App;
-
