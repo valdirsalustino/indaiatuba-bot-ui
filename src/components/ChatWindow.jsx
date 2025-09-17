@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import UserIcon from './UserIcon'; // This now correctly imports the one and only UserIcon
+import UserIcon from './UserIcon';
 
 const SendIcon = () => (
   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6">
@@ -8,7 +8,12 @@ const SendIcon = () => (
   </svg>
 );
 
-export default function ChatWindow({ conversation, onSendMessage }) {
+const SolvedIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-6 w-6 text-gray-500 hover:text-green-500"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+);
+
+
+export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved }) {
   const [newMessage, setNewMessage] = useState('');
   const messagesEndRef = useRef(null);
 
@@ -27,7 +32,6 @@ export default function ChatWindow({ conversation, onSendMessage }) {
     return (
       <div className="flex-grow flex items-center justify-center bg-gray-50">
         <div className="text-center text-gray-500">
-           {/* Now uses the correct imported UserIcon */}
           <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center mx-auto mb-2">
             <UserIcon className="h-10 w-10 text-gray-400" />
           </div>
@@ -37,15 +41,23 @@ export default function ChatWindow({ conversation, onSendMessage }) {
     );
   }
 
+  const needsAttention = conversation.messages.some(msg => msg.human_supervision);
   let lastMessageDate = null;
 
   return (
     <div className="flex-grow flex flex-col bg-gray-100">
-      <header className="flex items-center p-3 bg-white border-b border-gray-200 shadow-sm">
-         <div className="w-10 h-10 rounded-full mr-3 flex items-center justify-center bg-gray-200 flex-shrink-0">
-            <UserIcon className="h-6 w-6 text-gray-500" />
-         </div>
-         <h2 className="font-semibold text-gray-800">{conversation.thread_id}</h2>
+      <header className="flex items-center justify-between p-3 bg-white border-b border-gray-200 shadow-sm">
+        <div className="flex items-center">
+            <div className="w-10 h-10 rounded-full mr-3 flex items-center justify-center bg-gray-200 flex-shrink-0">
+                <UserIcon className="h-6 w-6 text-gray-500" />
+            </div>
+            <h2 className="font-semibold text-gray-800">{conversation.thread_id}</h2>
+        </div>
+        {needsAttention && (
+            <button onClick={() => onMarkAsSolved(conversation.thread_id)} title="Mark as Solved">
+                <SolvedIcon />
+            </button>
+        )}
       </header>
 
       <div className="flex-grow p-6 overflow-y-auto bg-cover bg-center" style={{ backgroundImage: "url('https://i.pinimg.com/736x/8c/98/99/8c98994518b575bfd8c949e91d20548b.jpg')" }}>
