@@ -44,25 +44,30 @@ function App() {
     ws.onmessage = (event) => {
       const data = JSON.parse(event.data);
       if (data.update === 'new_handoff_request') {
-        const data = JSON.parse(event.data);
-        console.log('New handoff request received!');
-        // TODO: when the user request handoff alert the human assistant in the panel by adding the logo
-        // Highlight message that require human assistant
-        fetchConversations();
-        // highlight_message(event.data.phone_number);
+        console.log('New handoff request received: ', data);
+        fetchConversations(); // Re-fetch conversations to show the new request
       }
       if (data.update === 'new_message') {
-        const data = JSON.parse(event.data);
-        console.log('New message received!');
-        fetchConversations();
+        console.log('New new message received: ', data);
+        fetchConversations(); // Re-fetch conversations to show the new request
       }
-
     };
     ws.onclose = () => console.log('WebSocket disconnected');
     ws.onerror = (err) => console.error('WebSocket error:', err);
 
     return () => ws.close();
   }, [token, fetchConversations]);
+
+  useEffect(() => {
+    if (selectedConversation?.thread_id) {
+      const updatedConversation = conversations.find(
+        (conv) => conv.thread_id === selectedConversation.thread_id
+      );
+      if (updatedConversation) {
+        setSelectedConversation(updatedConversation);
+      }
+    }
+  }, [conversations]); // The dependency array ensures this runs ONLY when 'conversations' changes.
 
   const handleLogin = (newToken) => {
     localStorage.setItem('admin_token', newToken);
@@ -136,4 +141,3 @@ function App() {
 }
 
 export default App;
-
