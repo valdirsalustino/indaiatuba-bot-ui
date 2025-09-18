@@ -27,7 +27,6 @@ function App() {
       if (!response.ok) throw new Error('Failed to fetch conversations.');
       const data = await response.json();
       setConversations(data);
-      // Updated logic: Check the top-level flag directly
       const needsAttention = data.some(conv => conv.human_supervision === true);
       setAnyNeedsAttention(needsAttention);
 
@@ -49,9 +48,9 @@ function App() {
     ws.onopen = () => console.log('WebSocket connected');
     ws.onmessage = (event) => {
       const data = JSON.parse(event.data);
-      if (data.update === 'new_handoff_request' || data.update === 'new_message') {
+      if (data.update === 'new_handoff_request' || data.update === 'new_message' || data.update === 'supervision_type_changed' || data.update === 'conversation_resolved') {
         console.log('New data received: ', data);
-        fetchConversations(); // Re-fetch conversations to show the new request
+        fetchConversations();
       }
     };
     ws.onclose = () => console.log('WebSocket disconnected');
@@ -123,9 +122,26 @@ function App() {
                 'Authorization': `Bearer ${token}`,
             },
         });
-        fetchConversations(); // Refresh the list
+        fetchConversations();
     } catch (err) {
         setError("Failed to mark as solved.");
+    }
+  };
+
+  // This function was missing in your running version of App.jsx
+  const handleUpdateSupervisionType = async (thread_id, newType) => {
+    try {
+        await fetch(`${API_BASE_URL}/conversations/${thread_id}/supervision-type`, {
+            method: 'PUT',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ human_supervision_type: newType }),
+        });
+        fetchConversations(); // Refresh to show the updated type
+    } catch (err) {
+        setError("Failed to update supervision type.");
     }
   };
 
@@ -148,6 +164,8 @@ function App() {
           conversation={selectedConversation}
           onSendMessage={handleSendMessage}
           onMarkAsSolved={handleMarkAsSolved}
+          // Make sure to pass the function as a prop here
+          onUpdateSupervisionType={handleUpdateSupervisionType}
         />
       </div>
     </div>

@@ -13,9 +13,12 @@ const SolvedIcon = () => (
 );
 
 
-export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved }) {
+export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved, onUpdateSupervisionType }) {
   const [newMessage, setNewMessage] = useState('');
   const messagesEndRef = useRef(null);
+
+  // Define all possible supervision types here
+  const allSupervisionTypes = ["Social", "Financeiro", "Esportes"];
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -25,6 +28,13 @@ export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved
     if (newMessage.trim()) {
       onSendMessage(newMessage);
       setNewMessage('');
+    }
+  };
+
+  const handleTypeChange = (e) => {
+    const newType = e.target.value;
+    if (newType) {
+        onUpdateSupervisionType(conversation.thread_id, newType);
     }
   };
 
@@ -41,9 +51,13 @@ export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved
     );
   }
 
-  // Updated logic to use the top-level property
   const needsAttention = conversation.human_supervision;
   let lastMessageDate = null;
+
+  // Calculate the available types for the dropdown
+  const availableTypes = allSupervisionTypes.filter(
+    (type) => type !== conversation.human_supervision_type
+  );
 
   return (
     <div className="flex-grow flex flex-col bg-gray-100">
@@ -54,19 +68,35 @@ export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved
             </div>
             <div>
                 <h2 className="font-semibold text-gray-800">{conversation.thread_id}</h2>
-                {/* Display handoff info if needed */}
                 {needsAttention && (
                     <div className="text-xs text-red-600">
-                        Atenção: {conversation.human_supervision_type} horário {new Date(conversation.last_handoff_timestamp).toLocaleTimeString()}
+                        Departamento: {conversation.human_supervision_type} hora do pedido de auxílio {new Date(conversation.last_handoff_timestamp).toLocaleTimeString()}
                     </div>
                 )}
             </div>
         </div>
-        {needsAttention && (
-            <button onClick={() => onMarkAsSolved(conversation.thread_id)} title="Mark as Solved">
-                <SolvedIcon />
-            </button>
-        )}
+        {/* Container for action buttons */}
+        <div className="flex items-center space-x-4">
+            {needsAttention && (
+                <div>
+                    <select
+                        onChange={handleTypeChange}
+                        value=""
+                        className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-1.5"
+                    >
+                        <option value="" disabled>Transferir</option>
+                        {availableTypes.map((type) => (
+                            <option key={type} value={type}>{type}</option>
+                        ))}
+                    </select>
+                </div>
+            )}
+            {needsAttention && (
+                <button onClick={() => onMarkAsSolved(conversation.thread_id)} title="Mark as Solved">
+                    <SolvedIcon />
+                </button>
+            )}
+        </div>
       </header>
 
       <div className="flex-grow p-6 overflow-y-auto bg-cover bg-center" style={{ backgroundImage: "url('https://i.pinimg.com/736x/8c/98/99/8c98994518b575bfd8c949e91d20548b.jpg')" }}>
