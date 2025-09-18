@@ -27,10 +27,8 @@ function App() {
       if (!response.ok) throw new Error('Failed to fetch conversations.');
       const data = await response.json();
       setConversations(data);
-      // Check if any conversation has a message needing human supervision
-      const needsAttention = data.some(conv =>
-        conv.messages.some(msg => msg.human_supervision === true)
-      );
+      // Updated logic: Check the top-level flag directly
+      const needsAttention = data.some(conv => conv.human_supervision === true);
       setAnyNeedsAttention(needsAttention);
 
     } catch (err) {
@@ -120,7 +118,7 @@ function App() {
   const handleMarkAsSolved = async (thread_id) => {
     try {
         await fetch(`${API_BASE_URL}/conversations/${thread_id}/resolve`, {
-            method: 'POST', // Or 'PUT', depending on your API design
+            method: 'POST',
             headers: {
                 'Authorization': `Bearer ${token}`,
             },
