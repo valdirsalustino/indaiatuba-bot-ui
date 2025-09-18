@@ -24,7 +24,7 @@ export default function ConversationList({ conversations, onSelect, selectedId, 
       </header>
       <div className="flex-grow overflow-y-auto">
         {conversations.map(conv => {
-          const needsAttention = conv.messages.some(msg => msg.human_supervision);
+          const needsAttention = conv.human_supervision;
           return (
             <div
               key={conv.thread_id}

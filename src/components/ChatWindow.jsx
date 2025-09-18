@@ -41,7 +41,8 @@ export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved
     );
   }
 
-  const needsAttention = conversation.messages.some(msg => msg.human_supervision);
+  // Updated logic to use the top-level property
+  const needsAttention = conversation.human_supervision;
   let lastMessageDate = null;
 
   return (
@@ -51,7 +52,15 @@ export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved
             <div className="w-10 h-10 rounded-full mr-3 flex items-center justify-center bg-gray-200 flex-shrink-0">
                 <UserIcon className="h-6 w-6 text-gray-500" />
             </div>
-            <h2 className="font-semibold text-gray-800">{conversation.thread_id}</h2>
+            <div>
+                <h2 className="font-semibold text-gray-800">{conversation.thread_id}</h2>
+                {/* Display handoff info if needed */}
+                {needsAttention && (
+                    <div className="text-xs text-red-600">
+                        Atenção: {conversation.human_supervision_type} horário {new Date(conversation.last_handoff_timestamp).toLocaleTimeString()}
+                    </div>
+                )}
+            </div>
         </div>
         {needsAttention && (
             <button onClick={() => onMarkAsSolved(conversation.thread_id)} title="Mark as Solved">
@@ -82,7 +91,7 @@ export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved
               <React.Fragment key={index}>
                 {dateDivider}
                 <div className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`rounded-xl px-4 py-2 max-w-lg shadow-md ${msg.sender === 'user' ? 'bg-green-100 text-gray-800' : 'bg-white text-gray-800'}`}>
+                  <div className={`rounded-xl px-4 py-2 max-w-lg shadow-md ${msg.sender === 'user' || msg.sender === 'admin' ? 'bg-green-100 text-gray-800' : 'bg-white text-gray-800'}`}>
                     <p className="whitespace-pre-wrap text-sm">{msg.text}</p>
                     <span className="text-xs text-gray-400 float-right mt-1 ml-2">{messageDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                   </div>
