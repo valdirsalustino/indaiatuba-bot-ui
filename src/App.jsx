@@ -2,10 +2,11 @@ import React, { useState, useEffect, useCallback } from 'react';
 import Login from './components/Login.jsx';
 import ConversationList from './components/ConversationList.jsx';
 import ChatWindow from './components/ChatWindow.jsx';
+import ConfirmationModal from './components/ConfirmationModal.jsx'; // Import the new modal component
 
 // --- API Configuration ---
-const API_BASE_URL = 'http://localhost:8000'; // Adjust if your backend is elsewhere
-const WEBSOCKET_URL = 'ws://localhost:8000/ws'; // Adjust for your WebSocket
+const API_BASE_URL = 'http://localhost:8000';
+const WEBSOCKET_URL = 'ws://localhost:8000/ws';
 
 function App() {
   const [token, setToken] = useState(() => localStorage.getItem('admin_token'));
@@ -15,7 +16,11 @@ function App() {
   const [error, setError] = useState(null);
   const [anyNeedsAttention, setAnyNeedsAttention] = useState(false);
 
+  // State for the confirmation modal
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [pendingTransfer, setPendingTransfer] = useState(null);
 
+  // (omitted fetchConversations and other useEffect hooks for brevity...)
   const fetchConversations = useCallback(async () => {
     if (!token) return;
     setIsLoading(true);
@@ -128,7 +133,6 @@ function App() {
     }
   };
 
-  // This function was missing in your running version of App.jsx
   const handleUpdateSupervisionType = async (thread_id, newType) => {
     try {
         await fetch(`${API_BASE_URL}/conversations/${thread_id}/supervision-type`, {
@@ -139,10 +143,34 @@ function App() {
             },
             body: JSON.stringify({ human_supervision_type: newType }),
         });
-        fetchConversations(); // Refresh to show the updated type
+        fetchConversations();
     } catch (err) {
         setError("Failed to update supervision type.");
     }
+  };
+
+  // --- New Modal Handling Logic ---
+
+  // 1. Called by ChatWindow when a new type is selected
+  const handleInitiateTransfer = (thread_id, newType) => {
+    setPendingTransfer({ thread_id, newType });
+    setIsModalOpen(true);
+  };
+
+  // 2. Called by the modal's "Confirm" button
+  const handleConfirmTransfer = () => {
+    if (pendingTransfer) {
+      handleUpdateSupervisionType(pendingTransfer.thread_id, pendingTransfer.newType);
+    }
+    // Close modal and clear state
+    setIsModalOpen(false);
+    setPendingTransfer(null);
+  };
+
+  // 3. Called by the modal's "Cancel" button or overlay click
+  const handleCancelTransfer = () => {
+    setIsModalOpen(false);
+    setPendingTransfer(null);
   };
 
 
@@ -152,6 +180,13 @@ function App() {
 
   return (
     <div className="h-screen w-screen bg-gray-200 flex font-sans antialiased text-gray-800">
+      {/* Conditionally render the modal */}
+      <ConfirmationModal
+        isOpen={isModalOpen}
+        onClose={handleCancelTransfer}
+        onConfirm={handleConfirmTransfer}
+        message={`Are you sure you want to re-assign this conversation to "${pendingTransfer?.newType}"?`}
+      />
       <div className="w-full h-full flex shadow-lg">
         <ConversationList
           conversations={conversations}
@@ -164,8 +199,8 @@ function App() {
           conversation={selectedConversation}
           onSendMessage={handleSendMessage}
           onMarkAsSolved={handleMarkAsSolved}
-          // Make sure to pass the function as a prop here
-          onUpdateSupervisionType={handleUpdateSupervisionType}
+          // Pass the new "initiate" function instead of the direct update function
+          onInitiateTransfer={handleInitiateTransfer}
         />
       </div>
     </div>

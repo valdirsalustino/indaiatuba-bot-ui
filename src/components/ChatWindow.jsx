@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import UserIcon from './UserIcon';
+import UserIcon from './UserIcon.jsx';
 
 const SendIcon = () => (
   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6">
@@ -13,7 +13,7 @@ const SolvedIcon = () => (
 );
 
 
-export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved, onUpdateSupervisionType }) {
+export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved, onInitiateTransfer }) {
   const [newMessage, setNewMessage] = useState('');
   const messagesEndRef = useRef(null);
 
@@ -34,7 +34,10 @@ export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved
   const handleTypeChange = (e) => {
     const newType = e.target.value;
     if (newType) {
-        onUpdateSupervisionType(conversation.thread_id, newType);
+        // This now calls the function in App.jsx to open the modal
+        onInitiateTransfer(conversation.thread_id, newType);
+        // Reset the dropdown to the placeholder after initiating the action
+        e.target.value = "";
     }
   };
 
@@ -54,7 +57,7 @@ export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved
   const needsAttention = conversation.human_supervision;
   let lastMessageDate = null;
 
-  // Calculate the available types for the dropdown
+  // Calculate the available types for the dropdown, excluding the current one
   const availableTypes = allSupervisionTypes.filter(
     (type) => type !== conversation.human_supervision_type
   );
@@ -70,7 +73,7 @@ export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved
                 <h2 className="font-semibold text-gray-800">{conversation.thread_id}</h2>
                 {needsAttention && (
                     <div className="text-xs text-red-600">
-                        Departamento: {conversation.human_supervision_type} hora do pedido de auxílio {new Date(conversation.last_handoff_timestamp).toLocaleTimeString()}
+                        Departamento: {conversation.human_supervision_type}. Hora pedido do auxílio: {new Date(conversation.last_handoff_timestamp).toLocaleTimeString()}
                     </div>
                 )}
             </div>
@@ -81,7 +84,7 @@ export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved
                 <div>
                     <select
                         onChange={handleTypeChange}
-                        value=""
+                        value="" // Controlled component set to empty to always show placeholder
                         className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-1.5"
                     >
                         <option value="" disabled>Transferir</option>
