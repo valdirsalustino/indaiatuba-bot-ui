@@ -2,9 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import Login from './components/Login.jsx';
 import ConversationList from './components/ConversationList.jsx';
 import ChatWindow from './components/ChatWindow.jsx';
-import ConfirmationModal from './components/ConfirmationModal.jsx'; // Import the new modal component
+import ConfirmationModal from './components/ConfirmationModal.jsx';
 
-// --- API Configuration ---
 const API_BASE_URL = 'http://localhost:8000';
 const WEBSOCKET_URL = 'ws://localhost:8000/ws';
 
@@ -16,11 +15,12 @@ function App() {
   const [error, setError] = useState(null);
   const [anyNeedsAttention, setAnyNeedsAttention] = useState(false);
 
-  // State for the confirmation modal
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [pendingTransfer, setPendingTransfer] = useState(null);
+  const [modalState, setModalState] = useState({
+    isOpen: false,
+    message: '',
+    onConfirm: () => {},
+  });
 
-  // (omitted fetchConversations and other useEffect hooks for brevity...)
   const fetchConversations = useCallback(async () => {
     if (!token) return;
     setIsLoading(true);
@@ -34,7 +34,6 @@ function App() {
       setConversations(data);
       const needsAttention = data.some(conv => conv.human_supervision === true);
       setAnyNeedsAttention(needsAttention);
-
     } catch (err) {
       setError(err.message);
     } finally {
@@ -127,6 +126,9 @@ function App() {
                 'Authorization': `Bearer ${token}`,
             },
         });
+        if (selectedConversation?.thread_id === thread_id) {
+            setSelectedConversation(null);
+        }
         fetchConversations();
     } catch (err) {
         setError("Failed to mark as solved.");
@@ -149,30 +151,30 @@ function App() {
     }
   };
 
-  // --- New Modal Handling Logic ---
-
-  // 1. Called by ChatWindow when a new type is selected
   const handleInitiateTransfer = (thread_id, newType) => {
-    setPendingTransfer({ thread_id, newType });
-    setIsModalOpen(true);
+    setModalState({
+      isOpen: true,
+      message: `Are you sure you want to re-assign this conversation to "${newType}"?`,
+      onConfirm: () => handleUpdateSupervisionType(thread_id, newType),
+    });
   };
 
-  // 2. Called by the modal's "Confirm" button
-  const handleConfirmTransfer = () => {
-    if (pendingTransfer) {
-      handleUpdateSupervisionType(pendingTransfer.thread_id, pendingTransfer.newType);
-    }
-    // Close modal and clear state
-    setIsModalOpen(false);
-    setPendingTransfer(null);
+  const handleInitiateSolve = (thread_id) => {
+    setModalState({
+      isOpen: true,
+      message: 'Are you sure you want to mark this conversation as solved?',
+      onConfirm: () => handleMarkAsSolved(thread_id),
+    });
   };
 
-  // 3. Called by the modal's "Cancel" button or overlay click
-  const handleCancelTransfer = () => {
-    setIsModalOpen(false);
-    setPendingTransfer(null);
+  const closeModal = () => {
+    setModalState({ isOpen: false, message: '', onConfirm: () => {} });
   };
 
+  const handleConfirm = () => {
+    modalState.onConfirm();
+    closeModal();
+  };
 
   if (!token) {
     return <Login onLogin={handleLogin} apiBaseUrl={API_BASE_URL} />;
@@ -180,12 +182,11 @@ function App() {
 
   return (
     <div className="h-screen w-screen bg-gray-200 flex font-sans antialiased text-gray-800">
-      {/* Conditionally render the modal */}
       <ConfirmationModal
-        isOpen={isModalOpen}
-        onClose={handleCancelTransfer}
-        onConfirm={handleConfirmTransfer}
-        message={`Are you sure you want to re-assign this conversation to "${pendingTransfer?.newType}"?`}
+        isOpen={modalState.isOpen}
+        onClose={closeModal}
+        onConfirm={handleConfirm}
+        message={modalState.message}
       />
       <div className="w-full h-full flex shadow-lg">
         <ConversationList
@@ -198,8 +199,7 @@ function App() {
         <ChatWindow
           conversation={selectedConversation}
           onSendMessage={handleSendMessage}
-          onMarkAsSolved={handleMarkAsSolved}
-          // Pass the new "initiate" function instead of the direct update function
+          onMarkAsSolved={handleInitiateSolve}
           onInitiateTransfer={handleInitiateTransfer}
         />
       </div>

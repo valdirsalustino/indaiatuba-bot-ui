@@ -17,7 +17,6 @@ export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved
   const [newMessage, setNewMessage] = useState('');
   const messagesEndRef = useRef(null);
 
-  // Define all possible supervision types here
   const allSupervisionTypes = ["Social", "Financeiro", "Esportes"];
 
   useEffect(() => {
@@ -34,9 +33,7 @@ export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved
   const handleTypeChange = (e) => {
     const newType = e.target.value;
     if (newType) {
-        // This now calls the function in App.jsx to open the modal
         onInitiateTransfer(conversation.thread_id, newType);
-        // Reset the dropdown to the placeholder after initiating the action
         e.target.value = "";
     }
   };
@@ -57,7 +54,6 @@ export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved
   const needsAttention = conversation.human_supervision;
   let lastMessageDate = null;
 
-  // Calculate the available types for the dropdown, excluding the current one
   const availableTypes = allSupervisionTypes.filter(
     (type) => type !== conversation.human_supervision_type
   );
@@ -78,13 +74,12 @@ export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved
                 )}
             </div>
         </div>
-        {/* Container for action buttons */}
         <div className="flex items-center space-x-4">
             {needsAttention && (
                 <div>
                     <select
                         onChange={handleTypeChange}
-                        value="" // Controlled component set to empty to always show placeholder
+                        value=""
                         className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-1.5"
                     >
                         <option value="" disabled>Transferir</option>
