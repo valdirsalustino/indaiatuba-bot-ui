@@ -77,28 +77,35 @@ export default function UserManagement({ token, apiBaseUrl, onAction, currentUse
     }
   };
 
-  const handleRoleChange = async (username, newRole) => {
-    try {
-      const response = await fetch(`${apiBaseUrl}/users/${username}/role`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({ role: newRole }),
-      });
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.detail || 'Failed to update role');
+  const handleRoleChange = (username, newRole) => {
+    onAction(
+      `Are you sure you want to change the role for user "${username}" to "${newRole}"?`,
+      async () => {
+        try {
+          const response = await fetch(`${apiBaseUrl}/users/${username}/role`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`,
+            },
+            body: JSON.stringify({ role: newRole }),
+          });
+          const data = await response.json();
+          if (!response.ok) {
+            throw new Error(data.detail || 'Failed to update role');
+          }
+          fetchUsers(); // Refresh the user list
+        } catch (err) {
+          setMessage(err.message);
+          setIsError(true);
+          // If the update fails, we should refetch to ensure the UI is consistent
+          fetchUsers();
+        }
       }
-      fetchUsers(); // Refresh the user list
-    } catch (err) {
-      setMessage(err.message);
-      setIsError(true);
-    }
+    );
   };
 
-  const handleDelete = async (username) => {
+  const handleDelete = (username) => {
     onAction(
         `Are you sure you want to delete the user "${username}"? This action cannot be undone.`,
         async () => {
@@ -157,6 +164,12 @@ export default function UserManagement({ token, apiBaseUrl, onAction, currentUse
                                     onChange={(e) => handleRoleChange(user.username, e.target.value)}
                                     className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-1.5"
                                     disabled={isCurrentUser}
+                                    onFocus={(e) => e.target.defaultValue = e.target.value} // Store original value on focus
+                                    onBlur={(e) => { // Revert if no confirmation
+                                        if (document.querySelector('.fixed.inset-0.bg-black')) {
+                                          e.target.value = e.target.defaultValue;
+                                        }
+                                    }}
                                 >
                                     <option value="Social">Social</option>
                                     <option value="Financeiro">Financeiro</option>
