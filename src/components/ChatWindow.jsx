@@ -40,7 +40,8 @@ export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved
   const handleTypeChange = (e) => {
     const newType = e.target.value;
     if (newType) {
-        onInitiateTransfer(conversation.thread_id, newType);
+        // Pass the composite_id to the handler
+        onInitiateTransfer(conversation.composite_id, newType);
         e.target.value = "";
     }
   };
@@ -52,13 +53,14 @@ export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved
           <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center mx-auto mb-2">
             <UserIcon className="h-10 w-10 text-gray-400" />
           </div>
-          <p className="mt-2 text-lg">Selecione uma conversa</p>
+          <p className="mt-2 text-lg">Selecione um tópico de conversa</p>
         </div>
       </div>
     );
   }
 
-  const needsAttention = conversation.human_supervision;
+  // A thread needs attention if it's open and flagged for human supervision.
+  const needsAttention = conversation.status === 'open' && conversation.human_supervision;
   let lastMessageDate = null;
 
   const availableTypes = allSupervisionTypes.filter(
@@ -73,17 +75,20 @@ export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved
                 <UserIcon className="h-6 w-6 text-gray-500" />
             </div>
             <div>
-                <h2 className="font-semibold text-gray-800">{conversation.thread_id}</h2>
+                <div className="flex items-center">
+                  <h2 className="font-semibold text-gray-800">{conversation.phone_number}</h2>
+                  <span className="ml-2 text-xs text-gray-500 bg-gray-200 px-2 py-0.5 rounded-full">{conversation.thread_id.replace('_', ' ')}</span>
+                </div>
                 {needsAttention && (
                     <div className="text-xs text-red-600">
-                        Departamento: {conversation.human_supervision_type}. Hora pedido do auxílio: {new Date(conversation.last_handoff_timestamp).toLocaleTimeString()}
+                        Departamento: {conversation.human_supervision_type}. Hora do pedido: {new Date(conversation.last_handoff_timestamp).toLocaleTimeString()}
                     </div>
                 )}
             </div>
         </div>
         <div className="flex items-center space-x-4">
-            {!needsAttention && (
-                <button onClick={() => onTakeOver(conversation.thread_id)} title="Falar diretamente com o cliente.">
+            {!needsAttention && conversation.status === 'open' && (
+                <button onClick={() => onTakeOver(conversation.composite_id)} title="Assumir conversa e falar com o cliente.">
                     <TakeOverIcon />
                 </button>
             )}
@@ -102,7 +107,7 @@ export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved
                 </div>
             )}
             {needsAttention && (
-                <button onClick={() => onMarkAsSolved(conversation.thread_id)} title="Mark as Solved">
+                <button onClick={() => onMarkAsSolved(conversation.composite_id)} title="Marcar como Resolvido">
                     <SolvedIcon />
                 </button>
             )}
@@ -146,9 +151,9 @@ export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved
 
             let bgColor = 'bg-green-100'; // Default for Human Assistants
             if (isUserMessage) {
-                bgColor = 'bg-white'; // White for the client
+                bgColor = 'bg-white';
             } else if (isBotMessage) {
-                bgColor = 'bg-yellow-100'; // Yellow for the Bot
+                bgColor = 'bg-yellow-100';
             }
 
             if (isToolMessage) return null;
@@ -185,8 +190,10 @@ export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved
             onKeyPress={(e) => e.key === 'Enter' && handleSend()}
             placeholder="Digite uma mensagem"
             className="flex-grow bg-transparent focus:outline-none text-gray-700"
+            // Desabilita a caixa de mensagem se a conversa estiver encerrada
+            disabled={conversation.status !== 'open'}
           />
-          <button onClick={handleSend} className="ml-3 text-blue-500 hover:text-blue-600 transition-colors duration-200">
+          <button onClick={handleSend} className="ml-3 text-blue-500 hover:text-blue-600 transition-colors duration-200 disabled:text-gray-400" disabled={conversation.status !== 'open'}>
             <SendIcon />
           </button>
         </div>
