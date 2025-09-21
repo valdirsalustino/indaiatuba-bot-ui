@@ -12,8 +12,16 @@ const SolvedIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6 text-gray-500 hover:text-green-500"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
 );
 
+// New "TakeOverIcon"
+const TakeOverIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6 text-gray-500 hover:text-blue-500" title="Falar diretamente com o cliente.">
+        <path d="M3 18v-6a9 9 0 0 1 18 0v6"></path>
+        <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"></path>
+    </svg>
+);
 
-export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved, onInitiateTransfer }) {
+
+export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved, onInitiateTransfer, onTakeOver }) {
   const [newMessage, setNewMessage] = useState('');
   const messagesEndRef = useRef(null);
 
@@ -75,6 +83,11 @@ export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved
             </div>
         </div>
         <div className="flex items-center space-x-4">
+            {!needsAttention && (
+                <button onClick={() => onTakeOver(conversation.thread_id)} title="Falar diretamente com o cliente.">
+                    <TakeOverIcon />
+                </button>
+            )}
             {needsAttention && (
                 <div>
                     <select

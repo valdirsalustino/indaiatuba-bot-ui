@@ -70,7 +70,7 @@ function App() {
     ws.onopen = () => console.log('WebSocket connected');
     ws.onmessage = (event) => {
       const data = JSON.parse(event.data);
-      if (['new_handoff_request', 'new_message', 'supervision_type_changed', 'conversation_resolved'].includes(data.update)) {
+      if (['new_handoff_request', 'new_message', 'supervision_type_changed', 'conversation_resolved', 'conversation_taken_over'].includes(data.update)) {
         console.log('New data received: ', data);
         fetchConversations();
       }
@@ -177,6 +177,27 @@ function App() {
     }
   };
 
+  const handleTakeOverConversation = async (thread_id) => {
+    try {
+        await fetch(`${API_BASE_URL}/conversations/${thread_id}/take-over`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}` },
+        });
+        fetchConversations();
+    } catch (err) {
+        setError("Failed to take over conversation.");
+    }
+  };
+
+  const handleInitiateTakeOver = (thread_id) => {
+    setModalState({
+      isOpen: true,
+      message: 'Tem certeza que quer falar diretamente com o cliente? O bot será desativado para esta conversa até que ela seja resolvida.',
+      onConfirm: () => handleTakeOverConversation(thread_id),
+      onClose: closeModal,
+    });
+  };
+
   const handleInitiateTransfer = (thread_id, newType) => {
     setModalState({
       isOpen: true,
@@ -243,6 +264,7 @@ function App() {
                 onSendMessage={handleSendMessage}
                 onMarkAsSolved={handleInitiateSolve}
                 onInitiateTransfer={handleInitiateTransfer}
+                onTakeOver={handleInitiateTakeOver}
             />
         )}
 
