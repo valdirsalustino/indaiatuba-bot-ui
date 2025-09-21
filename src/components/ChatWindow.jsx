@@ -87,29 +87,36 @@ export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved
             </div>
         </div>
         <div className="flex items-center space-x-4">
-            {!needsAttention && conversation.status === 'open' && (
-                <button onClick={() => onTakeOver(conversation.composite_id)} title="Assumir conversa e falar com o cliente.">
-                    <TakeOverIcon />
-                </button>
-            )}
-            {needsAttention && (
-                <div>
+            {/* Logic for showing buttons based on conversation state */}
+            {conversation.status === 'open' ? (
+              conversation.human_supervision ? (
+                // --- Case 1: Thread is OPEN and MANAGED BY A HUMAN ---
+                <>
+                  <div>
                     <select
-                        onChange={handleTypeChange}
-                        value=""
-                        className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-1.5"
+                      onChange={handleTypeChange}
+                      value=""
+                      className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-1.5"
                     >
-                        <option value="" disabled>Transferir</option>
-                        {availableTypes.map((type) => (
-                            <option key={type} value={type}>{type}</option>
-                        ))}
+                      <option value="" disabled>Transferir</option>
+                      {availableTypes.map((type) => (
+                        <option key={type} value={type}>{type}</option>
+                      ))}
                     </select>
-                </div>
-            )}
-            {needsAttention && (
-                <button onClick={() => onMarkAsSolved(conversation.composite_id)} title="Marcar como Resolvido">
+                  </div>
+                  <button onClick={() => onMarkAsSolved(conversation.composite_id)} title="Marcar como Resolvido">
                     <SolvedIcon />
+                  </button>
+                </>
+              ) : (
+                // --- Case 2: Thread is OPEN and MANAGED BY THE BOT ---
+                <button onClick={() => onTakeOver(conversation.composite_id)} title="Assumir conversa e desativar o bot">
+                  <TakeOverIcon />
                 </button>
+              )
+            ) : (
+              // --- Case 3: Thread is CLOSED ---
+              <span className="text-xs font-semibold text-gray-500 italic">Conversa Encerrada</span>
             )}
         </div>
       </header>
