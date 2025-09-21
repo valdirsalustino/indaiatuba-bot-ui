@@ -1,19 +1,37 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { jwtDecode } from 'jwt-decode';
 import Login from './components/Login.jsx';
 import ConversationList from './components/ConversationList.jsx';
 import ChatWindow from './components/ChatWindow.jsx';
 import ConfirmationModal from './components/ConfirmationModal.jsx';
+import UserManagement from './components/UserManagement.jsx'; // Import the new component
 
 const API_BASE_URL = 'http://localhost:8000';
 const WEBSOCKET_URL = 'ws://localhost:8000/ws';
 
+// Helper function to get user from token
+const getUserFromToken = (token) => {
+    if (!token) return null;
+    try {
+        const decoded = jwtDecode(token);
+        // Assuming the username is in the 'sub' claim
+        return { username: decoded.sub, role: decoded.role, name: decoded.name };
+    } catch (e) {
+        console.error("Invalid token:", e);
+        return null;
+    }
+};
+
+
 function App() {
   const [token, setToken] = useState(() => localStorage.getItem('admin_token'));
+  const [currentUser, setCurrentUser] = useState(() => getUserFromToken(localStorage.getItem('admin_token')));
   const [conversations, setConversations] = useState([]);
   const [selectedConversation, setSelectedConversation] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [anyNeedsAttention, setAnyNeedsAttention] = useState(false);
+  const [activeView, setActiveView] = useState('conversations'); // New state for view management
 
   const [modalState, setModalState] = useState({
     isOpen: false,
@@ -52,7 +70,7 @@ function App() {
     ws.onopen = () => console.log('WebSocket connected');
     ws.onmessage = (event) => {
       const data = JSON.parse(event.data);
-      if (data.update === 'new_handoff_request' || data.update === 'new_message' || data.update === 'supervision_type_changed' || data.update === 'conversation_resolved') {
+      if (['new_handoff_request', 'new_message', 'supervision_type_changed', 'conversation_resolved', 'conversation_taken_over'].includes(data.update)) {
         console.log('New data received: ', data);
         fetchConversations();
       }
@@ -70,6 +88,9 @@ function App() {
       );
       if (updatedConversation) {
         setSelectedConversation(updatedConversation);
+      } else {
+        // If the selected conversation disappears (e.g., filtered out), deselect it
+        setSelectedConversation(null);
       }
     }
   }, [conversations, selectedConversation?.thread_id]);
@@ -77,23 +98,29 @@ function App() {
   const handleLogin = (newToken) => {
     localStorage.setItem('admin_token', newToken);
     setToken(newToken);
+    setCurrentUser(getUserFromToken(newToken));
+    setActiveView('conversations'); // Default to conversations view on login
   };
 
   const handleLogout = () => {
     localStorage.removeItem('admin_token');
     setToken(null);
+    setCurrentUser(null);
     setConversations([]);
     setSelectedConversation(null);
   };
 
   const handleSelectConversation = (conversation) => {
     setSelectedConversation(conversation);
+    setActiveView('conversations'); // Ensure we are in the conversation view
   };
 
   const handleSendMessage = async (text) => {
     if (!selectedConversation) return;
 
-    const optimisticMessage = { sender: 'admin', text, timestamp: new Date().toISOString() };
+    const senderName = (currentUser.name || currentUser.username).toLowerCase();
+    const optimisticMessage = { sender: senderName, text, timestamp: new Date().toISOString() };
+
     setSelectedConversation(prev => ({
         ...prev,
         messages: [...prev.messages, optimisticMessage]
@@ -108,9 +135,12 @@ function App() {
             },
             body: JSON.stringify({ text }),
         });
+        // No need to fetch all conversations, just the current one for efficiency
+        // But for simplicity, we'll stick to refetching all
         fetchConversations();
     } catch (err) {
         setError("Failed to send message.");
+        // Rollback optimistic update
         setSelectedConversation(prev => ({
             ...prev,
             messages: prev.messages.slice(0, -1)
@@ -122,9 +152,7 @@ function App() {
     try {
         await fetch(`${API_BASE_URL}/conversations/${thread_id}/resolve`, {
             method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${token}`,
-            },
+            headers: { 'Authorization': `Bearer ${token}` },
         });
         if (selectedConversation?.thread_id === thread_id) {
             setSelectedConversation(null);
@@ -151,11 +179,33 @@ function App() {
     }
   };
 
+  const handleTakeOverConversation = async (thread_id) => {
+    try {
+        await fetch(`${API_BASE_URL}/conversations/${thread_id}/take-over`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}` },
+        });
+        fetchConversations();
+    } catch (err) {
+        setError("Failed to take over conversation.");
+    }
+  };
+
+  const handleInitiateTakeOver = (thread_id) => {
+    setModalState({
+      isOpen: true,
+      message: 'Tem certeza que quer falar diretamente com o cliente? O bot será desativado para esta conversa até que ela seja resolvida.',
+      onConfirm: () => handleTakeOverConversation(thread_id),
+      onClose: closeModal,
+    });
+  };
+
   const handleInitiateTransfer = (thread_id, newType) => {
     setModalState({
       isOpen: true,
       message: `Tem certeza que quer transferir essa conversa para o departamento "${newType}"?`,
       onConfirm: () => handleUpdateSupervisionType(thread_id, newType),
+      onClose: closeModal,
     });
   };
 
@@ -164,11 +214,21 @@ function App() {
       isOpen: true,
       message: 'Tem certeza que quer marcar essa conversa como resolvida?',
       onConfirm: () => handleMarkAsSolved(thread_id),
+      onClose: closeModal,
+    });
+  };
+
+  const openConfirmationModal = (message, onConfirm) => {
+    setModalState({
+        isOpen: true,
+        message,
+        onConfirm,
+        onClose: closeModal,
     });
   };
 
   const closeModal = () => {
-    setModalState({ isOpen: false, message: '', onConfirm: () => {} });
+    setModalState({ isOpen: false, message: '', onConfirm: () => {}, onClose: () => {} });
   };
 
   const handleConfirm = () => {
@@ -176,7 +236,7 @@ function App() {
     closeModal();
   };
 
-  if (!token) {
+  if (!token || !currentUser) {
     return <Login onLogin={handleLogin} apiBaseUrl={API_BASE_URL} />;
   }
 
@@ -195,13 +255,30 @@ function App() {
           selectedId={selectedConversation?.thread_id}
           onLogout={handleLogout}
           anyNeedsAttention={anyNeedsAttention}
+          isAdmin={currentUser.role === 'Admin'}
+          onShowUserManagement={() => setActiveView('userManagement')}
+          onShowConversations={() => setActiveView('conversations')}
         />
-        <ChatWindow
-          conversation={selectedConversation}
-          onSendMessage={handleSendMessage}
-          onMarkAsSolved={handleInitiateSolve}
-          onInitiateTransfer={handleInitiateTransfer}
-        />
+
+        {activeView === 'conversations' && (
+            <ChatWindow
+                conversation={selectedConversation}
+                onSendMessage={handleSendMessage}
+                onMarkAsSolved={handleInitiateSolve}
+                onInitiateTransfer={handleInitiateTransfer}
+                onTakeOver={handleInitiateTakeOver}
+                currentUser={currentUser}
+            />
+        )}
+
+        {activeView === 'userManagement' && currentUser.role === 'Admin' && (
+            <UserManagement
+                token={token}
+                apiBaseUrl={API_BASE_URL}
+                onAction={openConfirmationModal}
+                currentUser={currentUser}
+            />
+        )}
       </div>
     </div>
   );
