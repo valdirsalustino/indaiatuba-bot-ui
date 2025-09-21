@@ -1,7 +1,14 @@
 import React, { useState, useEffect } from 'react';
 
+// Corrected AddUserIcon SVG data
 const AddUserIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><line x1="23" y1="11" x2="23" y2="17"></line><line x1="20" y1="14" x2="26" y2="14"></line></svg>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6">
+        <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+        <circle cx="9" cy="7" r="4"></circle>
+        {/* The plus sign coordinates are now fully inside the 24x24 viewbox */}
+        <line x1="21" y1="11" x2="21" y2="17"></line>
+        <line x1="18" y1="14" x2="24" y2="14"></line>
+    </svg>
 );
 
 const TrashIcon = () => (
@@ -134,7 +141,7 @@ export default function UserManagement({ token, apiBaseUrl, onAction, currentUse
       <div className="w-full max-w-4xl p-8 bg-white rounded-lg shadow-md">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-2xl font-bold text-gray-700">User Management</h2>
-            <button onClick={() => setIsAdding(true)} className="text-blue-500 hover:text-blue-700">
+            <button onClick={() => setIsAdding(true)} className="text-blue-500 hover:text-blue-700 p-1 rounded-full border border-transparent hover:border-blue-300">
                 <AddUserIcon />
             </button>
           </div>
