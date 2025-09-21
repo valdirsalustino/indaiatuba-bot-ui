@@ -15,7 +15,7 @@ export default function ConversationList({ conversations, onSelect, selectedId, 
     <div className="w-full md:w-1/3 lg:w-1/4 bg-white border-r border-gray-200 flex flex-col">
       <header className="p-4 border-b border-gray-200 flex justify-between items-center">
         <div className="flex items-center">
-            <h1 className="text-xl font-bold text-gray-800 mr-2">Conversations</h1>
+            <h1 className="text-xl font-bold text-gray-800 mr-2">Conversas</h1>
             {anyNeedsAttention && <AlertIcon />}
         </div>
         <button onClick={onLogout} title="Logout" className="text-gray-500 hover:text-red-500 transition-colors">

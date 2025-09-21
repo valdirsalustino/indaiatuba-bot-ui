@@ -8,7 +8,7 @@ export default function ConfirmationModal({ isOpen, onClose, onConfirm, message 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center">
       <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-sm">
-        <h3 className="text-lg font-medium text-gray-900 mb-4">Confirm Action</h3>
+        <h3 className="text-lg font-medium text-gray-900 mb-4">Confirmação</h3>
         <p className="text-sm text-gray-600 mb-6">{message}</p>
         <div className="flex justify-end space-x-4">
           <button

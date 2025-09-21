@@ -154,7 +154,7 @@ function App() {
   const handleInitiateTransfer = (thread_id, newType) => {
     setModalState({
       isOpen: true,
-      message: `Are you sure you want to re-assign this conversation to "${newType}"?`,
+      message: `Tem certeza que quer transferir essa conversa para o departamento "${newType}"?`,
       onConfirm: () => handleUpdateSupervisionType(thread_id, newType),
     });
   };
@@ -162,7 +162,7 @@ function App() {
   const handleInitiateSolve = (thread_id) => {
     setModalState({
       isOpen: true,
-      message: 'Are you sure you want to mark this conversation as solved?',
+      message: 'Tem certeza que quer marcar essa conversa como resolvida?',
       onConfirm: () => handleMarkAsSolved(thread_id),
     });
   };

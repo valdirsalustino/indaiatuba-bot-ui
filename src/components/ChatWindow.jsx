@@ -45,7 +45,7 @@ export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved
           <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center mx-auto mb-2">
             <UserIcon className="h-10 w-10 text-gray-400" />
           </div>
-          <p className="mt-2 text-lg">Select a conversation to start chatting</p>
+          <p className="mt-2 text-lg">Selecione uma conversa</p>
         </div>
       </div>
     );
