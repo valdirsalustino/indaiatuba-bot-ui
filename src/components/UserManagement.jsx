@@ -1,23 +1,56 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
-const UserIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5 mr-2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+const AddUserIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><line x1="23" y1="11" x2="23" y2="17"></line><line x1="20" y1="14" x2="26" y2="14"></line></svg>
 );
 
-export default function UserManagement({ token, apiBaseUrl }) {
-  const [username, setUsername] = useState('');
-  const [role, setRole] = useState('Social');
+const TrashIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+);
+
+const SaveIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+);
+
+const CancelIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+);
+
+
+export default function UserManagement({ token, apiBaseUrl, onAction }) {
   const [message, setMessage] = useState('');
   const [isError, setIsError] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [createdUser, setCreatedUser] = useState(null); // To store new user credentials
+  const [users, setUsers] = useState([]);
+  const [isAdding, setIsAdding] = useState(false);
+  const [newUser, setNewUser] = useState({ username: '', role: 'Social' });
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const fetchUsers = async () => {
+    try {
+      const response = await fetch(`${apiBaseUrl}/users`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.detail || 'Failed to fetch users');
+      }
+      setUsers(data);
+    } catch (err) {
+      setMessage(err.message);
+      setIsError(true);
+    }
+  };
+
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
+  const handleAddUser = async () => {
     setIsLoading(true);
     setMessage('');
     setIsError(false);
-    setCreatedUser(null);
 
     try {
       const response = await fetch(`${apiBaseUrl}/users`, {
@@ -26,16 +59,16 @@ export default function UserManagement({ token, apiBaseUrl }) {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
-        body: JSON.stringify({ username, role }),
+        body: JSON.stringify(newUser),
       });
       const data = await response.json();
       if (!response.ok) {
         throw new Error(data.detail || 'Failed to create user');
       }
-      setMessage(`User "${data.username}" created successfully!`);
-      setCreatedUser({ username: data.username, tempPassword: data.temporary_password });
-      setUsername('');
-      setRole('Social');
+      setMessage(`User "${data.username}" created successfully! Temporary Password: ${data.temporary_password}`);
+      setIsAdding(false);
+      setNewUser({ username: '', role: 'Social' });
+      fetchUsers(); // Refresh the user list
     } catch (err) {
       setMessage(err.message);
       setIsError(true);
@@ -44,65 +77,133 @@ export default function UserManagement({ token, apiBaseUrl }) {
     }
   };
 
+  const handleRoleChange = async (username, newRole) => {
+    try {
+      const response = await fetch(`${apiBaseUrl}/users/${username}/role`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ role: newRole }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.detail || 'Failed to update role');
+      }
+      fetchUsers(); // Refresh the user list
+    } catch (err) {
+      setMessage(err.message);
+      setIsError(true);
+    }
+  };
+
+  const handleDelete = async (username) => {
+    onAction(
+        `Are you sure you want to delete the user "${username}"? This action cannot be undone.`,
+        async () => {
+            try {
+                const response = await fetch(`${apiBaseUrl}/users/${username}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                    },
+                });
+                const data = await response.json();
+                if (!response.ok) {
+                    throw new Error(data.detail || 'Failed to delete user');
+                }
+                fetchUsers(); // Refresh the user list
+            } catch (err) {
+                setMessage(err.message);
+                setIsError(true);
+            }
+        }
+    );
+  };
+
   return (
     <div className="flex-grow flex items-center justify-center bg-gray-50">
-      <div className="w-full max-w-md p-8 space-y-6 bg-white rounded-lg shadow-md">
-        <h2 className="text-2xl font-bold text-center text-gray-700 flex items-center justify-center">
-            <UserIcon />
-            Create New User
-        </h2>
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div>
-            <label htmlFor="username" className="text-sm font-medium text-gray-600 block">Username</label>
-            <input
-              type="text"
-              id="username"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              className="w-full px-4 py-2 mt-2 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
-              required
-            />
+      <div className="w-full max-w-4xl p-8 bg-white rounded-lg shadow-md">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-2xl font-bold text-gray-700">User Management</h2>
+            <button onClick={() => setIsAdding(true)} className="text-blue-500 hover:text-blue-700">
+                <AddUserIcon />
+            </button>
           </div>
-          <div>
-            <label htmlFor="role" className="text-sm font-medium text-gray-600 block">Role</label>
-            <select
-                id="role"
-                value={role}
-                onChange={(e) => setRole(e.target.value)}
-                className="w-full px-4 py-2 mt-2 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
-            >
-                <option value="Social">Social</option>
-                <option value="Financeiro">Financeiro</option>
-                <option value="Esportes">Esportes</option>
-                <option value="Admin">Admin</option>
-            </select>
-          </div>
-
           {message && (
-            <p className={`text-sm text-center font-semibold ${isError ? 'text-red-600' : 'text-green-600'}`}>
+            <p className={`text-sm text-center font-semibold mb-4 ${isError ? 'text-red-600' : 'text-green-600'}`}>
               {message}
             </p>
           )}
-
-          {createdUser && (
-            <div className="p-4 bg-blue-50 border border-blue-200 rounded-md text-sm">
-                <p className="font-bold text-gray-800">Share these credentials with the new user:</p>
-                <p className="mt-2 text-gray-700"><strong>Username:</strong> {createdUser.username}</p>
-                <p className="text-gray-700"><strong>Temporary Password:</strong> <span className="font-mono bg-gray-200 px-1 rounded">{createdUser.tempPassword}</span></p>
-                <p className="mt-2 text-xs text-gray-500">They will be required to set a new password on their first login.</p>
-            </div>
-          )}
-
-          <div>
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="w-full px-4 py-2 font-bold text-white bg-blue-500 rounded-md hover:bg-blue-600 focus:outline-none focus:bg-blue-700 disabled:bg-blue-300"
-            >
-              {isLoading ? 'Creating...' : 'Create User'}
-            </button>
+          <div className="overflow-x-auto">
+              <table className="w-full text-sm text-left text-gray-500">
+                  <thead className="text-xs text-gray-700 uppercase bg-gray-50">
+                      <tr>
+                          <th scope="col" className="px-6 py-3">Username</th>
+                          <th scope="col" className="px-6 py-3">Role</th>
+                          <th scope="col" className="px-6 py-3 text-right">Actions</th>
+                      </tr>
+                  </thead>
+                  <tbody>
+                      {users.map(user => (
+                          <tr key={user.username} className="bg-white border-b hover:bg-gray-50">
+                              <td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap">{user.username}</td>
+                              <td className="px-6 py-4">
+                                <select
+                                    value={user.role}
+                                    onChange={(e) => handleRoleChange(user.username, e.target.value)}
+                                    className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-1.5"
+                                >
+                                    <option value="Social">Social</option>
+                                    <option value="Financeiro">Financeiro</option>
+                                    <option value="Esportes">Esportes</option>
+                                    <option value="Admin">Admin</option>
+                                </select>
+                              </td>
+                              <td className="px-6 py-4 text-right">
+                                  <button onClick={() => handleDelete(user.username)} className="text-red-500 hover:text-red-700">
+                                      <TrashIcon />
+                                  </button>
+                              </td>
+                          </tr>
+                      ))}
+                      {isAdding && (
+                          <tr className="bg-blue-50 border-b">
+                              <td className="px-6 py-4">
+                                  <input
+                                      type="text"
+                                      value={newUser.username}
+                                      onChange={(e) => setNewUser({...newUser, username: e.target.value})}
+                                      className="w-full px-2 py-1 border rounded-md"
+                                      placeholder="New username"
+                                  />
+                              </td>
+                              <td className="px-6 py-4">
+                                  <select
+                                      value={newUser.role}
+                                      onChange={(e) => setNewUser({...newUser, role: e.target.value})}
+                                      className="w-full p-1.5 border rounded-md"
+                                  >
+                                      <option value="Social">Social</option>
+                                      <option value="Financeiro">Financeiro</option>
+                                      <option value="Esportes">Esportes</option>
+                                      <option value="Admin">Admin</option>
+                                  </select>
+                              </td>
+                              <td className="px-6 py-4 text-right">
+                                  <button onClick={handleAddUser} disabled={isLoading} className="text-green-500 hover:text-green-700 mr-2">
+                                      <SaveIcon />
+                                  </button>
+                                  <button onClick={() => setIsAdding(false)} className="text-gray-500 hover:text-gray-700">
+                                      <CancelIcon />
+                                  </button>
+                              </td>
+                          </tr>
+                      )}
+                  </tbody>
+              </table>
           </div>
-        </form>
       </div>
     </div>
   );

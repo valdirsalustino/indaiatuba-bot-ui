@@ -195,6 +195,15 @@ function App() {
     });
   };
 
+  const openConfirmationModal = (message, onConfirm) => {
+    setModalState({
+        isOpen: true,
+        message,
+        onConfirm,
+        onClose: closeModal,
+    });
+  };
+
   const closeModal = () => {
     setModalState({ isOpen: false, message: '', onConfirm: () => {}, onClose: () => {} });
   };
@@ -225,6 +234,7 @@ function App() {
           anyNeedsAttention={anyNeedsAttention}
           isAdmin={currentUser.role === 'Admin'}
           onShowUserManagement={() => setActiveView('userManagement')}
+          onShowConversations={() => setActiveView('conversations')}
         />
 
         {activeView === 'conversations' && (
@@ -237,7 +247,11 @@ function App() {
         )}
 
         {activeView === 'userManagement' && currentUser.role === 'Admin' && (
-            <UserManagement token={token} apiBaseUrl={API_BASE_URL} />
+            <UserManagement
+                token={token}
+                apiBaseUrl={API_BASE_URL}
+                onAction={openConfirmationModal}
+            />
         )}
       </div>
     </div>
