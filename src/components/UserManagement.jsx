@@ -17,7 +17,7 @@ const CancelIcon = () => (
 );
 
 
-export default function UserManagement({ token, apiBaseUrl, onAction }) {
+export default function UserManagement({ token, apiBaseUrl, onAction, currentUser }) {
   const [message, setMessage] = useState('');
   const [isError, setIsError] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -65,7 +65,7 @@ export default function UserManagement({ token, apiBaseUrl, onAction }) {
       if (!response.ok) {
         throw new Error(data.detail || 'Failed to create user');
       }
-      setMessage(`User "${data.username}" created successfully! Temporary Password: ${data.temporary_password}`);
+      setMessage(`User "${data.username}" created successfully! Password: ${data.temporary_password}`);
       setIsAdding(false);
       setNewUser({ username: '', role: 'Social' });
       fetchUsers(); // Refresh the user list
@@ -146,14 +146,17 @@ export default function UserManagement({ token, apiBaseUrl, onAction }) {
                       </tr>
                   </thead>
                   <tbody>
-                      {users.map(user => (
-                          <tr key={user.username} className="bg-white border-b hover:bg-gray-50">
+                      {users.map(user => {
+                        const isCurrentUser = user.username === currentUser.username;
+                        return (
+                          <tr key={user.username} className={`bg-white border-b ${isCurrentUser ? 'bg-gray-100' : 'hover:bg-gray-50'}`}>
                               <td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap">{user.username}</td>
                               <td className="px-6 py-4">
                                 <select
                                     value={user.role}
                                     onChange={(e) => handleRoleChange(user.username, e.target.value)}
                                     className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-1.5"
+                                    disabled={isCurrentUser}
                                 >
                                     <option value="Social">Social</option>
                                     <option value="Financeiro">Financeiro</option>
@@ -162,12 +165,15 @@ export default function UserManagement({ token, apiBaseUrl, onAction }) {
                                 </select>
                               </td>
                               <td className="px-6 py-4 text-right">
-                                  <button onClick={() => handleDelete(user.username)} className="text-red-500 hover:text-red-700">
-                                      <TrashIcon />
-                                  </button>
+                                  {!isCurrentUser && (
+                                    <button onClick={() => handleDelete(user.username)} className="text-red-500 hover:text-red-700">
+                                        <TrashIcon />
+                                    </button>
+                                  )}
                               </td>
                           </tr>
-                      ))}
+                        )
+                      })}
                       {isAdding && (
                           <tr className="bg-blue-50 border-b">
                               <td className="px-6 py-4">

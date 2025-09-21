@@ -251,6 +251,7 @@ function App() {
                 token={token}
                 apiBaseUrl={API_BASE_URL}
                 onAction={openConfirmationModal}
+                currentUser={currentUser}
             />
         )}
       </div>
