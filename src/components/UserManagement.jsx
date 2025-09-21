@@ -30,7 +30,7 @@ export default function UserManagement({ token, apiBaseUrl, onAction, currentUse
   const [isLoading, setIsLoading] = useState(false);
   const [users, setUsers] = useState([]);
   const [isAdding, setIsAdding] = useState(false);
-  const [newUser, setNewUser] = useState({ username: '', role: 'Social' });
+  const [newUser, setNewUser] = useState({ username: '', name: '', role: 'Social' });
 
   const fetchUsers = async () => {
     try {
@@ -74,7 +74,7 @@ export default function UserManagement({ token, apiBaseUrl, onAction, currentUse
       }
       setMessage(`User "${data.username}" created successfully! Password: ${data.temporary_password}`);
       setIsAdding(false);
-      setNewUser({ username: '', role: 'Social' });
+      setNewUser({ username: '', name: '', role: 'Social' });
       fetchUsers(); // Refresh the user list
     } catch (err) {
       setMessage(err.message);
@@ -84,22 +84,22 @@ export default function UserManagement({ token, apiBaseUrl, onAction, currentUse
     }
   };
 
-  const handleRoleChange = (username, newRole) => {
+  const handleUpdateUser = (username, data) => {
     onAction(
-      `Are you sure you want to change the role for user "${username}" to "${newRole}"?`,
+      `Are you sure you want to update user "${username}"?`,
       async () => {
         try {
-          const response = await fetch(`${apiBaseUrl}/users/${username}/role`, {
+          const response = await fetch(`${apiBaseUrl}/users/${username}`, {
             method: 'PUT',
             headers: {
               'Content-Type': 'application/json',
               'Authorization': `Bearer ${token}`,
             },
-            body: JSON.stringify({ role: newRole }),
+            body: JSON.stringify(data),
           });
-          const data = await response.json();
+          const responseData = await response.json();
           if (!response.ok) {
-            throw new Error(data.detail || 'Failed to update role');
+            throw new Error(responseData.detail || 'Failed to update user');
           }
           fetchUsers(); // Refresh the user list
         } catch (err) {
@@ -155,6 +155,7 @@ export default function UserManagement({ token, apiBaseUrl, onAction, currentUse
                   <thead className="text-xs text-gray-700 uppercase bg-gray-50">
                       <tr>
                           <th scope="col" className="px-6 py-3">Username</th>
+                          <th scope="col" className="px-6 py-3">Name</th>
                           <th scope="col" className="px-6 py-3">Role</th>
                           <th scope="col" className="px-6 py-3 text-right">Actions</th>
                       </tr>
@@ -165,10 +166,11 @@ export default function UserManagement({ token, apiBaseUrl, onAction, currentUse
                         return (
                           <tr key={user.username} className={`bg-white border-b ${isCurrentUser ? 'bg-gray-100' : 'hover:bg-gray-50'}`}>
                               <td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap">{user.username}</td>
+                              <td className="px-6 py-4">{user.name}</td>
                               <td className="px-6 py-4">
                                 <select
                                     value={user.role}
-                                    onChange={(e) => handleRoleChange(user.username, e.target.value)}
+                                    onChange={(e) => handleUpdateUser(user.username, { role: e.target.value })}
                                     className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-1.5"
                                     disabled={isCurrentUser}
                                     onFocus={(e) => e.target.defaultValue = e.target.value} // Store original value on focus
@@ -203,6 +205,15 @@ export default function UserManagement({ token, apiBaseUrl, onAction, currentUse
                                       onChange={(e) => setNewUser({...newUser, username: e.target.value})}
                                       className="w-full px-2 py-1 border rounded-md"
                                       placeholder="New username"
+                                  />
+                              </td>
+                              <td className="px-6 py-4">
+                                  <input
+                                      type="text"
+                                      value={newUser.name}
+                                      onChange={(e) => setNewUser({...newUser, name: e.target.value})}
+                                      className="w-full px-2 py-1 border rounded-md"
+                                      placeholder="Full Name"
                                   />
                               </td>
                               <td className="px-6 py-4">

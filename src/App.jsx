@@ -15,7 +15,7 @@ const getUserFromToken = (token) => {
     try {
         const decoded = jwtDecode(token);
         // Assuming the username is in the 'sub' claim
-        return { username: decoded.sub, role: decoded.role };
+        return { username: decoded.sub, role: decoded.role, name: decoded.name };
     } catch (e) {
         console.error("Invalid token:", e);
         return null;
@@ -118,7 +118,9 @@ function App() {
   const handleSendMessage = async (text) => {
     if (!selectedConversation) return;
 
-    const optimisticMessage = { sender: 'admin', text, timestamp: new Date().toISOString() };
+    const senderName = (currentUser.name || currentUser.username).toLowerCase();
+    const optimisticMessage = { sender: senderName, text, timestamp: new Date().toISOString() };
+
     setSelectedConversation(prev => ({
         ...prev,
         messages: [...prev.messages, optimisticMessage]
@@ -265,6 +267,7 @@ function App() {
                 onMarkAsSolved={handleInitiateSolve}
                 onInitiateTransfer={handleInitiateTransfer}
                 onTakeOver={handleInitiateTakeOver}
+                currentUser={currentUser}
             />
         )}
 

@@ -2,26 +2,25 @@ import React, { useState, useEffect, useRef } from 'react';
 import UserIcon from './UserIcon.jsx';
 
 const SendIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6">
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6">
     <line x1="22" y1="2" x2="11" y2="13"></line>
     <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
   </svg>
 );
 
 const SolvedIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6 text-gray-500 hover:text-green-500"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6 text-gray-500 hover:text-green-500"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
 );
 
-// New "TakeOverIcon"
 const TakeOverIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6 text-gray-500 hover:text-blue-500" title="Falar diretamente com o cliente.">
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6 text-gray-500 hover:text-blue-500" title="Falar diretamente com o cliente.">
         <path d="M3 18v-6a9 9 0 0 1 18 0v6"></path>
         <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"></path>
     </svg>
 );
 
 
-export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved, onInitiateTransfer, onTakeOver }) {
+export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved, onInitiateTransfer, onTakeOver, currentUser }) {
   const [newMessage, setNewMessage] = useState('');
   const messagesEndRef = useRef(null);
 
@@ -128,14 +127,47 @@ export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved
               lastMessageDate = currentDateStr;
             }
 
+            const isUserMessage = msg.sender === 'user';
+            const isBotMessage = msg.sender === 'bot';
+            const isToolMessage = msg.sender === 'bot_tool';
+            const isAdminMessage = !isUserMessage && !isBotMessage && !isToolMessage;
+
+            let senderName = null;
+            if (isUserMessage) {
+                senderName = "Cliente";
+            } else if (isBotMessage) {
+                senderName = "Indaiatuba IA";
+            } else if (isAdminMessage) {
+                senderName = msg.sender;
+            }
+
+            const justification = isUserMessage ? 'justify-end' : 'justify-start';
+            const nameAlignment = isUserMessage ? 'text-right mr-2' : 'text-left ml-2';
+
+            let bgColor = 'bg-green-100'; // Default for Human Assistants
+            if (isUserMessage) {
+                bgColor = 'bg-white'; // White for the client
+            } else if (isBotMessage) {
+                bgColor = 'bg-yellow-100'; // Yellow for the Bot
+            }
+
+            if (isToolMessage) return null;
+
             return (
               <React.Fragment key={index}>
                 {dateDivider}
-                <div className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`rounded-xl px-4 py-2 max-w-lg shadow-md ${msg.sender === 'user' || msg.sender === 'admin' ? 'bg-green-100 text-gray-800' : 'bg-white text-gray-800'}`}>
-                    <p className="whitespace-pre-wrap text-sm">{msg.text}</p>
-                    <span className="text-xs text-gray-400 float-right mt-1 ml-2">{messageDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                  </div>
+                <div className={`flex ${justification}`}>
+                    <div className="flex flex-col max-w-lg">
+                        {senderName && (
+                            <span className={`text-xs text-gray-700 font-bold capitalize ${nameAlignment} ${bgColor} border border-gray-200 rounded-t-lg px-2 py-1 self-start`}>
+                                {senderName}
+                            </span>
+                        )}
+                        <div className={`rounded-xl px-4 py-2 shadow-md ${bgColor} text-gray-800 ${senderName ? 'rounded-t-none' : ''}`}>
+                            <p className="whitespace-pre-wrap text-sm">{msg.text}</p>
+                            <span className="text-xs text-gray-400 float-right mt-1 ml-2">{messageDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                        </div>
+                    </div>
                 </div>
               </React.Fragment>
             );
