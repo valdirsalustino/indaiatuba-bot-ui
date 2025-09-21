@@ -2,10 +2,10 @@ import React, { useState, useEffect, useCallback } from 'react';
 import Login from './components/Login.jsx';
 import ConversationList from './components/ConversationList.jsx';
 import ChatWindow from './components/ChatWindow.jsx';
+import ConfirmationModal from './components/ConfirmationModal.jsx';
 
-// --- API Configuration ---
-const API_BASE_URL = 'http://localhost:8000'; // Adjust if your backend is elsewhere
-const WEBSOCKET_URL = 'ws://localhost:8000/ws'; // Adjust for your WebSocket
+const API_BASE_URL = 'http://localhost:8000';
+const WEBSOCKET_URL = 'ws://localhost:8000/ws';
 
 function App() {
   const [token, setToken] = useState(() => localStorage.getItem('admin_token'));
@@ -15,6 +15,11 @@ function App() {
   const [error, setError] = useState(null);
   const [anyNeedsAttention, setAnyNeedsAttention] = useState(false);
 
+  const [modalState, setModalState] = useState({
+    isOpen: false,
+    message: '',
+    onConfirm: () => {},
+  });
 
   const fetchConversations = useCallback(async () => {
     if (!token) return;
@@ -27,10 +32,8 @@ function App() {
       if (!response.ok) throw new Error('Failed to fetch conversations.');
       const data = await response.json();
       setConversations(data);
-      // Updated logic: Check the top-level flag directly
       const needsAttention = data.some(conv => conv.human_supervision === true);
       setAnyNeedsAttention(needsAttention);
-
     } catch (err) {
       setError(err.message);
     } finally {
@@ -49,9 +52,9 @@ function App() {
     ws.onopen = () => console.log('WebSocket connected');
     ws.onmessage = (event) => {
       const data = JSON.parse(event.data);
-      if (data.update === 'new_handoff_request' || data.update === 'new_message') {
+      if (data.update === 'new_handoff_request' || data.update === 'new_message' || data.update === 'supervision_type_changed' || data.update === 'conversation_resolved') {
         console.log('New data received: ', data);
-        fetchConversations(); // Re-fetch conversations to show the new request
+        fetchConversations();
       }
     };
     ws.onclose = () => console.log('WebSocket disconnected');
@@ -123,12 +126,55 @@ function App() {
                 'Authorization': `Bearer ${token}`,
             },
         });
-        fetchConversations(); // Refresh the list
+        if (selectedConversation?.thread_id === thread_id) {
+            setSelectedConversation(null);
+        }
+        fetchConversations();
     } catch (err) {
         setError("Failed to mark as solved.");
     }
   };
 
+  const handleUpdateSupervisionType = async (thread_id, newType) => {
+    try {
+        await fetch(`${API_BASE_URL}/conversations/${thread_id}/supervision-type`, {
+            method: 'PUT',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ human_supervision_type: newType }),
+        });
+        fetchConversations();
+    } catch (err) {
+        setError("Failed to update supervision type.");
+    }
+  };
+
+  const handleInitiateTransfer = (thread_id, newType) => {
+    setModalState({
+      isOpen: true,
+      message: `Tem certeza que quer transferir essa conversa para o departamento "${newType}"?`,
+      onConfirm: () => handleUpdateSupervisionType(thread_id, newType),
+    });
+  };
+
+  const handleInitiateSolve = (thread_id) => {
+    setModalState({
+      isOpen: true,
+      message: 'Tem certeza que quer marcar essa conversa como resolvida?',
+      onConfirm: () => handleMarkAsSolved(thread_id),
+    });
+  };
+
+  const closeModal = () => {
+    setModalState({ isOpen: false, message: '', onConfirm: () => {} });
+  };
+
+  const handleConfirm = () => {
+    modalState.onConfirm();
+    closeModal();
+  };
 
   if (!token) {
     return <Login onLogin={handleLogin} apiBaseUrl={API_BASE_URL} />;
@@ -136,6 +182,12 @@ function App() {
 
   return (
     <div className="h-screen w-screen bg-gray-200 flex font-sans antialiased text-gray-800">
+      <ConfirmationModal
+        isOpen={modalState.isOpen}
+        onClose={closeModal}
+        onConfirm={handleConfirm}
+        message={modalState.message}
+      />
       <div className="w-full h-full flex shadow-lg">
         <ConversationList
           conversations={conversations}
@@ -147,7 +199,8 @@ function App() {
         <ChatWindow
           conversation={selectedConversation}
           onSendMessage={handleSendMessage}
-          onMarkAsSolved={handleMarkAsSolved}
+          onMarkAsSolved={handleInitiateSolve}
+          onInitiateTransfer={handleInitiateTransfer}
         />
       </div>
     </div>

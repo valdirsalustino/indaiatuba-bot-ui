@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import UserIcon from './UserIcon';
+import UserIcon from './UserIcon.jsx';
 
 const SendIcon = () => (
   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6">
@@ -13,9 +13,11 @@ const SolvedIcon = () => (
 );
 
 
-export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved }) {
+export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved, onInitiateTransfer }) {
   const [newMessage, setNewMessage] = useState('');
   const messagesEndRef = useRef(null);
+
+  const allSupervisionTypes = ["Social", "Financeiro", "Esportes"];
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -28,6 +30,14 @@ export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved
     }
   };
 
+  const handleTypeChange = (e) => {
+    const newType = e.target.value;
+    if (newType) {
+        onInitiateTransfer(conversation.thread_id, newType);
+        e.target.value = "";
+    }
+  };
+
   if (!conversation) {
     return (
       <div className="flex-grow flex items-center justify-center bg-gray-50">
@@ -35,15 +45,18 @@ export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved
           <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center mx-auto mb-2">
             <UserIcon className="h-10 w-10 text-gray-400" />
           </div>
-          <p className="mt-2 text-lg">Select a conversation to start chatting</p>
+          <p className="mt-2 text-lg">Selecione uma conversa</p>
         </div>
       </div>
     );
   }
 
-  // Updated logic to use the top-level property
   const needsAttention = conversation.human_supervision;
   let lastMessageDate = null;
+
+  const availableTypes = allSupervisionTypes.filter(
+    (type) => type !== conversation.human_supervision_type
+  );
 
   return (
     <div className="flex-grow flex flex-col bg-gray-100">
@@ -54,19 +67,34 @@ export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved
             </div>
             <div>
                 <h2 className="font-semibold text-gray-800">{conversation.thread_id}</h2>
-                {/* Display handoff info if needed */}
                 {needsAttention && (
                     <div className="text-xs text-red-600">
-                        Atenção: {conversation.human_supervision_type} horário {new Date(conversation.last_handoff_timestamp).toLocaleTimeString()}
+                        Departamento: {conversation.human_supervision_type}. Hora pedido do auxílio: {new Date(conversation.last_handoff_timestamp).toLocaleTimeString()}
                     </div>
                 )}
             </div>
         </div>
-        {needsAttention && (
-            <button onClick={() => onMarkAsSolved(conversation.thread_id)} title="Mark as Solved">
-                <SolvedIcon />
-            </button>
-        )}
+        <div className="flex items-center space-x-4">
+            {needsAttention && (
+                <div>
+                    <select
+                        onChange={handleTypeChange}
+                        value=""
+                        className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-1.5"
+                    >
+                        <option value="" disabled>Transferir</option>
+                        {availableTypes.map((type) => (
+                            <option key={type} value={type}>{type}</option>
+                        ))}
+                    </select>
+                </div>
+            )}
+            {needsAttention && (
+                <button onClick={() => onMarkAsSolved(conversation.thread_id)} title="Mark as Solved">
+                    <SolvedIcon />
+                </button>
+            )}
+        </div>
       </header>
 
       <div className="flex-grow p-6 overflow-y-auto bg-cover bg-center" style={{ backgroundImage: "url('https://i.pinimg.com/736x/8c/98/99/8c98994518b575bfd8c949e91d20548b.jpg')" }}>
