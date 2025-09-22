@@ -252,6 +252,7 @@ function App() {
           isAdmin={currentUser.role === 'Admin'}
           onShowUserManagement={() => setActiveView('userManagement')}
           onShowConversations={() => setActiveView('conversations')}
+          currentUser={currentUser}
         />
 
         {activeView === 'conversations' && (

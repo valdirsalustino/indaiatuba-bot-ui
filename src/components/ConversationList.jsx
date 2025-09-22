@@ -14,7 +14,7 @@ const ManageUsersIcon = () => (
 );
 
 
-export default function ConversationList({ conversations, onSelect, selectedId, onLogout, anyNeedsAttention, isAdmin, onShowUserManagement }) {
+export default function ConversationList({ conversations, onSelect, selectedId, onLogout, anyNeedsAttention, isAdmin, onShowUserManagement, currentUser }) {
   // Sort conversations by the last_updated time in descending order (latest first)
   const sortedConversations = [...conversations].sort((a, b) => new Date(b.last_updated) - new Date(a.last_updated));
 
@@ -70,6 +70,19 @@ export default function ConversationList({ conversations, onSelect, selectedId, 
           )
         })}
       </div>
+      {currentUser && (
+        <footer className="p-3 border-t border-gray-200 bg-gray-50">
+            <div className="flex items-center">
+                <div className="w-10 h-10 rounded-full mr-3 flex items-center justify-center bg-gray-300 text-gray-600 font-bold flex-shrink-0">
+                    {currentUser.name ? currentUser.name.charAt(0).toUpperCase() : currentUser.username.charAt(0).toUpperCase()}
+                </div>
+                <div>
+                    <p className="font-semibold text-sm text-gray-800 capitalize">{currentUser.name || currentUser.username}</p>
+                    <p className="text-xs text-gray-500">{currentUser.role}</p>
+                </div>
+            </div>
+        </footer>
+      )}
     </div>
   );
 }
