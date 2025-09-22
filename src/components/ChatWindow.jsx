@@ -195,12 +195,22 @@ export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved
             value={newMessage}
             onChange={(e) => setNewMessage(e.target.value)}
             onKeyPress={(e) => e.key === 'Enter' && handleSend()}
-            placeholder="Digite uma mensagem"
+            placeholder={
+              conversation.status !== 'open'
+                ? "Conversa encerrada"
+                : !conversation.human_supervision
+                ? "Assuma a conversa para enviar mensagens"
+                : "Digite uma mensagem"
+            }
             className="flex-grow bg-transparent focus:outline-none text-gray-700"
-            // Desabilita a caixa de mensagem se a conversa estiver encerrada
-            disabled={conversation.status !== 'open'}
+            // Disable the input if the conversation is closed or if the bot is still active
+            disabled={conversation.status !== 'open' || !conversation.human_supervision}
           />
-          <button onClick={handleSend} className="ml-3 text-blue-500 hover:text-blue-600 transition-colors duration-200 disabled:text-gray-400" disabled={conversation.status !== 'open'}>
+          <button
+            onClick={handleSend}
+            className="ml-3 text-blue-500 hover:text-blue-600 transition-colors duration-200 disabled:text-gray-400"
+            disabled={conversation.status !== 'open' || !conversation.human_supervision}
+          >
             <SendIcon />
           </button>
         </div>

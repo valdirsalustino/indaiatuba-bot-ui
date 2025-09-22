@@ -15,8 +15,11 @@ const ManageUsersIcon = () => (
 
 
 export default function ConversationList({ conversations, onSelect, selectedId, onLogout, anyNeedsAttention, isAdmin, onShowUserManagement }) {
+  // Sort conversations by the last_updated time in descending order (latest first)
+  const sortedConversations = [...conversations].sort((a, b) => new Date(b.last_updated) - new Date(a.last_updated));
+
   // Filter to show only open or recently closed conversations for a cleaner UI
-  const filteredConversations = conversations.filter(conv => conv.status.startsWith('open') || conv.status.startsWith('closed'));
+  const filteredConversations = sortedConversations.filter(conv => conv.status.startsWith('open') || conv.status.startsWith('closed'));
 
   return (
     <div className="w-full md:w-1/3 lg:w-1/4 bg-white border-r border-gray-200 flex flex-col">
