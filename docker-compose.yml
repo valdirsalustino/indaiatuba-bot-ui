@@ -1,0 +1,6 @@
+services:
+  admin-ui:
+    build: .
+    container_name: admin-ui
+    ports:
+      - "8080:80"
