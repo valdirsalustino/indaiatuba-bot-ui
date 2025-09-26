@@ -29,7 +29,7 @@ export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved
   const [attachedFile, setAttachedFile] = useState(null);
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
-  const allSupervisionTypes = ["Social", "Financeiro", "Esportes"];
+  const allSupervisionTypes = ["Social", "Administração", "Esporte, Cultura e Artes"];
 
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [conversation]);
   useEffect(() => { setNewMessage(''); setAttachedFile(null); }, [conversation?.composite_id]);

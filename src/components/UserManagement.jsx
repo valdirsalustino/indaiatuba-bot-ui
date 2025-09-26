@@ -181,8 +181,8 @@ export default function UserManagement({ token, apiBaseUrl, onAction, currentUse
                                     }}
                                 >
                                     <option value="Social">Social</option>
-                                    <option value="Financeiro">Financeiro</option>
-                                    <option value="Esportes">Esportes</option>
+                                    <option value="Administração">Administração</option>
+                                    <option value="Esporte, Cultura e Artes">Esporte, Cultura e Artes</option>
                                     <option value="Admin">Admin</option>
                                 </select>
                               </td>
@@ -223,8 +223,8 @@ export default function UserManagement({ token, apiBaseUrl, onAction, currentUse
                                       className="w-full p-1.5 border rounded-md"
                                   >
                                       <option value="Social">Social</option>
-                                      <option value="Financeiro">Financeiro</option>
-                                      <option value="Esportes">Esportes</option>
+                                      <option value="Administração">Administração</option>
+                                      <option value="Esporte, Cultura e Artes">Esporte, Cultura e Artes</option>
                                       <option value="Admin">Admin</option>
                                   </select>
                               </td>
