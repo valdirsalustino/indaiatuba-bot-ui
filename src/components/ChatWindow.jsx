@@ -1,12 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import UserIcon from './UserIcon.jsx';
 
+// --- ICONS ---
 const SendIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg> );
 const SolvedIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6 text-gray-500 hover:text-green-500"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg> );
 const TakeOverIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6 text-gray-500 hover:text-blue-500" title="Falar diretamente com o cliente."><path d="M3 18v-6a9 9 0 0 1 18 0v6"></path><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"></path></svg> );
 const PaperclipIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg> );
 const DownloadIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5 mr-2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg> );
 
+// --- Media Renderer Component ---
 const MediaRenderer = ({ msg }) => {
     switch (msg.content_type) {
         case 'image':
@@ -54,6 +56,7 @@ export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved
   return (
     <div className="flex-grow flex flex-col bg-gray-100">
       <header className="flex items-center justify-between p-3 bg-white border-b border-gray-200 shadow-sm">
+        {/* Header is unchanged */}
         <div className="flex items-center">
             <div className="w-10 h-10 rounded-full mr-3 flex items-center justify-center bg-gray-200 flex-shrink-0"><UserIcon className="h-6 w-6 text-gray-500" /></div>
             <div>
@@ -94,10 +97,17 @@ export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved
             }
 
             const isUserMessage = msg.sender === 'user';
+            const isBotMessage = msg.sender === 'bot';
             const justification = isUserMessage ? 'justify-end' : 'justify-start';
             const nameAlignment = isUserMessage ? 'text-right mr-2' : 'text-left ml-2';
-            let bgColor = isUserMessage ? 'bg-white' : 'bg-green-100';
             let senderName = msg.sender === 'user' ? 'Cliente' : msg.sender === 'bot' ? 'Indaiatuba IA' : msg.sender;
+
+            let bgColor = 'bg-green-100';
+            if (isUserMessage) {
+                bgColor = 'bg-white';
+            } else if (isBotMessage) {
+                bgColor = 'bg-yellow-100';
+            }
 
             return (
               <React.Fragment key={index}>
@@ -122,6 +132,7 @@ export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved
       </div>
 
       <footer className="bg-gray-50 p-4 border-t border-gray-200">
+        {/* Footer is unchanged */}
         {attachedFile && (
             <div className="px-4 pb-2 text-sm text-gray-600 flex justify-between items-center">
                 <span>Anexado: {attachedFile.name}</span>
