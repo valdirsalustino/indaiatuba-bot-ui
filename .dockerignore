@@ -1,0 +1,16 @@
+# Ignore dependencies
+node_modules
+
+# Ignore build output (it will be generated inside the container)
+dist
+build
+
+# Ignore environment variables
+.env
+.env.*
+
+# Ignore logs and temporary files
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.DS_Store
