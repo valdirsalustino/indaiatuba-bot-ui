@@ -64,7 +64,7 @@ export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved
                   <h2 className="font-semibold text-gray-800">{conversation.phone_number}</h2>
                   <span className="ml-2 text-xs text-gray-500 bg-gray-200 px-2 py-0.5 rounded-full">{conversation.thread_id.replace('_', ' ')}</span>
                 </div>
-                {needsAttention && ( <div className="text-xs text-red-600"> Departamento: {conversation.human_supervision_type}. Hora do pedido: {new Date(conversation.last_handoff_timestamp).toLocaleTimeString()} </div> )}
+                {needsAttention && ( <div className="text-xs text-red-600"> Departamento: {conversation.human_supervision_type}. Hora do pedido: {new Date(conversation.last_handoff_timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} </div> )}
             </div>
         </div>
         <div className="flex items-center space-x-4">
