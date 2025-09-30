@@ -1,8 +1,13 @@
-import React from 'react';
+import React, { useState } from 'react';
 import UserIcon from './UserIcon';
 
+// --- ICONS (Added SearchIcon) ---
+const SearchIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5 text-gray-400"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+);
+
 const LogoutIcon = () => (
-    <svg xmlns="http://www.w.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
 );
 
 const AlertIcon = () => (
@@ -13,21 +18,12 @@ const ManageUsersIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
 );
 
-/**
- * Formats a timestamp for display in the conversation list.
- * - Shows time for today's messages (e.g., "14:30").
- * - Shows "Ontem" for yesterday's messages.
- * - Shows date for older messages (e.g., "28/09").
- * @param {string} timestamp - The ISO string of the date to format.
- * @returns {string} The formatted date string.
- */
 const formatDisplayDate = (timestamp) => {
   const messageDate = new Date(timestamp);
   const today = new Date();
   const yesterday = new Date();
   yesterday.setDate(yesterday.getDate() - 1);
 
-  // Compare year, month, and day
   const isToday = messageDate.getFullYear() === today.getFullYear() &&
                   messageDate.getMonth() === today.getMonth() &&
                   messageDate.getDate() === today.getDate();
@@ -47,11 +43,30 @@ const formatDisplayDate = (timestamp) => {
 
 
 export default function ConversationList({ conversations, onSelect, selectedId, onLogout, anyNeedsAttention, isAdmin, onShowUserManagement, currentUser }) {
-  // Sort conversations by the last_updated time in descending order (latest first)
+  const [searchQuery, setSearchQuery] = useState('');
+
   const sortedConversations = [...conversations].sort((a, b) => new Date(b.last_updated) - new Date(a.last_updated));
 
-  // Filter to show only open or recently closed conversations for a cleaner UI
-  const filteredConversations = sortedConversations.filter(conv => conv.status.startsWith('open') || conv.status.startsWith('closed'));
+  const filteredConversations = sortedConversations.filter(conv => {
+    const query = searchQuery.toLowerCase();
+    // If there's no query, show all conversations (that are open or recently closed)
+    if (!query) {
+        return conv.status.startsWith('open') || conv.status.startsWith('closed');
+    }
+
+    // Check if the phone number matches
+    if (conv.phone_number.includes(query)) {
+        return true;
+    }
+
+    // Check if any message text includes the query
+    // This assumes `conv.messages` is available. If not, this part needs adjustment based on available data.
+    if (conv.messages && Array.isArray(conv.messages)) {
+        return conv.messages.some(msg => msg.text && msg.text.toLowerCase().includes(query));
+    }
+
+    return false;
+  });
 
   return (
     <div className="w-full md:w-1/3 lg:w-1/4 bg-white border-r border-gray-200 flex flex-col">
@@ -71,15 +86,32 @@ export default function ConversationList({ conversations, onSelect, selectedId, 
             </button>
         </div>
       </header>
+
+      {/* --- Search Bar --- */}
+      <div className="p-2 border-b border-gray-200">
+        <div className="relative">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <SearchIcon />
+            </div>
+            <input
+                type="text"
+                placeholder="Pesquisar ou começar uma nova conversa"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full bg-gray-100 border border-gray-200 rounded-full py-2 pl-10 pr-4 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+            />
+        </div>
+      </div>
+
+
       <div className="flex-grow overflow-y-auto">
         {filteredConversations.map(conv => {
-          // A thread needs attention if it's open and flagged for human supervision.
           const needsAttention = conv.status === 'open' && conv.human_supervision;
           const isClosed = conv.status !== 'open';
 
           return (
             <div
-              key={conv.composite_id} // Use the composite ID as the unique key
+              key={conv.composite_id}
               onClick={() => onSelect(conv)}
               className={`flex items-center p-3 cursor-pointer transition-colors duration-200 relative ${selectedId === conv.composite_id ? 'bg-blue-50' : 'hover:bg-gray-50'}`}
             >
