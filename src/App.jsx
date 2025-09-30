@@ -20,6 +20,11 @@ const getUserFromToken = (token) => {
     if (!token) return null;
     try {
         const decoded = jwtDecode(token);
+        // Check if the token is expired
+        if (decoded.exp * 1000 < Date.now()) {
+            console.log("Token expired.");
+            return null;
+        }
         return { username: decoded.sub, role: decoded.role, name: decoded.name };
     } catch (e) {
         console.error("Invalid token:", e);
@@ -43,29 +48,69 @@ function App() {
     onConfirm: () => {},
   });
 
+  const handleLogout = useCallback(() => {
+    localStorage.removeItem('admin_token');
+    setToken(null);
+    setCurrentUser(null);
+  }, []);
+
+  const authFetch = useCallback(async (url, options = {}) => {
+      const currentToken = localStorage.getItem('admin_token');
+      if (!currentToken) {
+        handleLogout();
+        throw new Error('No token found');
+      }
+
+      const headers = {
+          ...options.headers,
+          'Authorization': `Bearer ${currentToken}`,
+      };
+
+      const response = await fetch(url, { ...options, headers });
+
+      if (response.status === 401 || response.status === 403) {
+          // Token is invalid or expired
+          handleLogout();
+          throw new Error('Authentication failed');
+      }
+
+      return response;
+  }, [handleLogout]);
+
+
   const fetchConversations = useCallback(async () => {
     if (!token) return;
     setIsLoading(true);
     setError(null);
     try {
-      const response = await fetch(`${API_BASE_URL}/conversations`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      const response = await authFetch(`${API_BASE_URL}/conversations`);
       if (!response.ok) throw new Error('Failed to fetch conversations.');
       const data = await response.json();
       setConversations(data);
       const needsAttention = data.some(conv => conv.status === 'open' && conv.human_supervision === true);
       setAnyNeedsAttention(needsAttention);
     } catch (err) {
-      setError(err.message);
+      if (err.message !== 'Authentication failed') {
+          setError(err.message);
+      }
     } finally {
       setIsLoading(false);
     }
-  }, [token]);
+  }, [token, authFetch]);
+
 
   useEffect(() => {
-    fetchConversations();
-  }, [fetchConversations]);
+    const initialToken = localStorage.getItem('admin_token');
+    if (initialToken && !getUserFromToken(initialToken)) {
+        handleLogout();
+    }
+  }, [handleLogout]);
+
+  useEffect(() => {
+    if (token) {
+        fetchConversations();
+    }
+  }, [token, fetchConversations]);
 
   useEffect(() => {
     if (!token) return;
@@ -92,15 +137,14 @@ function App() {
 
   const handleLogin = (newToken) => {
     localStorage.setItem('admin_token', newToken);
-    setToken(newToken);
-    setCurrentUser(getUserFromToken(newToken));
-    setActiveView('conversations');
-  };
-
-  const handleLogout = () => {
-    localStorage.removeItem('admin_token');
-    setToken(null);
-    setCurrentUser(null);
+    const user = getUserFromToken(newToken);
+    if(user){
+        setToken(newToken);
+        setCurrentUser(user);
+        setActiveView('conversations');
+    } else {
+        handleLogout();
+    }
   };
 
   const handleSelectConversation = (conversation) => {
@@ -120,27 +164,29 @@ function App() {
     }
 
     try {
-        await fetch(`${API_BASE_URL}/conversations/${selectedConversation.composite_id}/send`, {
+        await authFetch(`${API_BASE_URL}/conversations/${selectedConversation.composite_id}/send`, {
             method: 'POST',
-            headers: { 'Authorization': `Bearer ${token}` },
             body: formData,
         });
-        // The websocket will trigger a refetch, so no need for optimistic update here
     } catch (err) {
-        setError("Failed to send message.");
+        if (err.message !== 'Authentication failed') {
+            setError("Failed to send message.");
+        }
     }
   };
 
-  const handleApiCall = async (url, options, successMessage) => {
+  const handleApiCall = async (url, options) => {
     try {
-      const response = await fetch(url, options);
+      const response = await authFetch(url, options);
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.detail || 'An error occurred.');
       }
       // No need to refetch here, websocket will handle it
     } catch (err) {
-      setError(err.message);
+        if (err.message !== 'Authentication failed') {
+            setError(err.message);
+        }
     }
   };
 
@@ -150,11 +196,7 @@ function App() {
       message: 'Tem certeza que deseja marcar esta conversa como resolvida?',
       onConfirm: () => handleApiCall(
         `${API_BASE_URL}/conversations/${compositeId}/resolve`,
-        {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${token}` },
-        },
-        'Conversation marked as resolved.'
+        { method: 'POST' }
       ),
     });
   };
@@ -167,13 +209,9 @@ function App() {
         `${API_BASE_URL}/conversations/${compositeId}/supervision-type`,
         {
           method: 'PUT',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ human_supervision_type: newType }),
-        },
-        'Conversation transferred.'
+        }
       ),
     });
   };
@@ -184,11 +222,7 @@ function App() {
       message: 'Tem certeza que deseja assumir esta conversa? O bot será desativado para este tópico.',
       onConfirm: () => handleApiCall(
         `${API_BASE_URL}/conversations/${compositeId}/take-over`,
-        {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${token}` },
-        },
-        'Conversation taken over.'
+        { method: 'POST' }
       ),
     });
   };
