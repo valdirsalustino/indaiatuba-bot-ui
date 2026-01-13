@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import UserIcon from './UserIcon.jsx';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 // --- ICONS ---
 const SendIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg> );
@@ -56,7 +58,6 @@ export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved
   return (
     <div className="flex-grow flex flex-col bg-gray-100">
       <header className="flex items-center justify-between p-3 bg-white border-b border-gray-200 shadow-sm">
-        {/* Header is unchanged */}
         <div className="flex items-center">
             <div className="w-10 h-10 rounded-full mr-3 flex items-center justify-center bg-gray-200 flex-shrink-0"><UserIcon className="h-6 w-6 text-gray-500" /></div>
             <div>
@@ -124,7 +125,23 @@ export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved
                         <div className={`rounded-xl px-4 py-2 shadow-md ${bgColor} text-gray-800 ${senderName ? 'rounded-t-none' : ''}`}>
                             <div className="flex flex-col">
                                 {msg.media_url && <MediaRenderer msg={msg} />}
-                                {msg.text && <p className={`whitespace-pre-wrap text-sm ${msg.media_url ? 'mt-2' : ''}`}>{msg.text}</p>}
+                                {msg.text && (
+                                    <ReactMarkdown
+                                        className={`text-sm ${msg.media_url ? 'mt-2' : ''} overflow-hidden`}
+                                        remarkPlugins={[remarkGfm]}
+                                        components={{
+                                            p: ({node, ...props}) => <p className="mb-2 last:mb-0 whitespace-pre-wrap" {...props} />,
+                                            strong: ({node, ...props}) => <span className="font-bold" {...props} />,
+                                            em: ({node, ...props}) => <span className="italic" {...props} />,
+                                            ul: ({node, ...props}) => <ul className="list-disc ml-4 mb-2" {...props} />,
+                                            ol: ({node, ...props}) => <ol className="list-decimal ml-4 mb-2" {...props} />,
+                                            li: ({node, ...props}) => <li className="mb-1" {...props} />,
+                                            a: ({node, ...props}) => <a className="text-blue-600 underline hover:text-blue-800" target="_blank" rel="noopener noreferrer" {...props} />
+                                        }}
+                                    >
+                                        {msg.text}
+                                    </ReactMarkdown>
+                                )}
                             </div>
                             <span className="text-xs text-gray-400 float-right mt-1 ml-2">{messageDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                         </div>
@@ -138,7 +155,6 @@ export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved
       </div>
 
       <footer className="bg-gray-50 p-4 border-t border-gray-200">
-        {/* Footer is unchanged */}
         {attachedFile && (
             <div className="px-4 pb-2 text-sm text-gray-600 flex justify-between items-center">
                 <span>Anexado: {attachedFile.name}</span>
