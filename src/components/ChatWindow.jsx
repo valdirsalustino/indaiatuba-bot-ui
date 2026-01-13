@@ -61,7 +61,13 @@ export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved
             <div className="w-10 h-10 rounded-full mr-3 flex items-center justify-center bg-gray-200 flex-shrink-0"><UserIcon className="h-6 w-6 text-gray-500" /></div>
             <div>
                 <div className="flex items-center">
-                  <h2 className="font-semibold text-gray-800">{conversation.phone_number}</h2>
+                  <div className="flex flex-col">
+                      <h2 className="font-semibold text-gray-800">
+                          {conversation.user_name || conversation.phone_number}
+                      </h2> {conversation.user_name && (
+                        <span className="text-xs text-gray-500">{conversation.phone_number}</span>
+                      )}
+                  </div>
                   <span className="ml-2 text-xs text-gray-500 bg-gray-200 px-2 py-0.5 rounded-full">{conversation.thread_id.replace('_', ' ')}</span>
                 </div>
                 {needsAttention && ( <div className="text-xs text-red-600"> Departamento: {conversation.human_supervision_type}. Hora do pedido: {new Date(conversation.last_handoff_timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} </div> )}

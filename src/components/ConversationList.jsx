@@ -121,7 +121,13 @@ export default function ConversationList({ conversations, onSelect, selectedId, 
               <div className="flex-grow overflow-hidden">
                 <div className="flex justify-between items-center">
                   <div className="flex items-center">
-                    <h2 className="font-semibold text-gray-700 truncate">{conv.phone_number}</h2>
+                    <div className="flex flex-col">
+                        <h2 className="font-semibold text-gray-700 truncate">
+                            {conv.user_name || conv.phone_number}
+                        </h2> {conv.user_name && (
+                            <span className="text-xs text-gray-500">{conv.phone_number}</span>
+                        )}
+                    </div>
                     <span className="ml-2 text-xs text-gray-500 bg-gray-200 px-2 py-0.5 rounded-full">{conv.thread_id.replace('_', ' ')}</span>
                   </div>
                   <span className="text-xs text-gray-400 flex-shrink-0 ml-2">{formatDisplayDate(conv.last_updated)}</span>
