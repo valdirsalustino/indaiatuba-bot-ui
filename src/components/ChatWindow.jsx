@@ -15,7 +15,7 @@ const BoldIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" width="18" heig
 const ItalicIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="19" y1="4" x2="10" y2="4"></line><line x1="14" y1="20" x2="5" y2="20"></line><line x1="15" y1="4" x2="9" y2="20"></line></svg> );
 const StrikeIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M17.3 19c-1.4 1.3-3.2 2-5.3 2-4.4 0-8-3.6-8-8 0-1.8.6-3.5 1.7-4.8"></path><path d="M10.3 4.2c1.1-.2 2.3-.2 3.4 0 4.4.7 7.7 4.5 7.7 8.8 0 1.2-.2 2.3-.5 3.3"></path><line x1="4" y1="12" x2="20" y2="12"></line></svg> );
 const ListIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg> );
-
+const OrderedListIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="10" y1="6" x2="21" y2="6"></line><line x1="10" y1="12" x2="21" y2="12"></line><line x1="10" y1="18" x2="21" y2="18"></line><path d="M4 6h1v4"></path><path d="M4 10h2"></path><path d="M6 18H4c0-1 2-2 2-3s-1-1.5-2-1"></path></svg> );
 
 // --- Media Renderer Component ---
 const MediaRenderer = ({ msg }) => {
@@ -44,11 +44,21 @@ export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [conversation]);
   useEffect(() => { setNewMessage(''); setAttachedFile(null); }, [conversation?.composite_id]);
 
+  // --- Auto-Resize Logic ---
+  useEffect(() => {
+    if (textInputRef.current) {
+        textInputRef.current.style.height = 'auto';
+        const newHeight = Math.min(textInputRef.current.scrollHeight, 160);
+        textInputRef.current.style.height = `${newHeight}px`;
+        textInputRef.current.style.overflowY = textInputRef.current.scrollHeight > 160 ? 'auto' : 'hidden';
+    }
+  }, [newMessage]);
+
   const handleSend = () => { if (newMessage.trim() || attachedFile) { onSendMessage({ text: newMessage, file: attachedFile }); setNewMessage(''); setAttachedFile(null); } };
   const handleFileChange = (e) => { if (e.target.files && e.target.files[0]) { setAttachedFile(e.target.files[0]); } };
   const handleTypeChange = (e) => { const newType = e.target.value; if (newType) { onInitiateTransfer(conversation.composite_id, newType); e.target.value = ""; } };
 
-  // Helper function to insert markdown at cursor position
+  // --- IMPROVED FORMATTING LOGIC ---
   const insertFormat = (formatType) => {
     const input = textInputRef.current;
     if (!input) return;
@@ -56,6 +66,44 @@ export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved
     const start = input.selectionStart;
     const end = input.selectionEnd;
     const text = newMessage;
+
+    // 1. Handle Block Formats (Lists) differently to apply to full lines
+    if (formatType === 'list' || formatType === 'ordered-list') {
+        // Find the start of the first line involved in selection
+        let lineStart = text.lastIndexOf('\n', start - 1) + 1;
+        // Find the end of the last line involved in selection
+        let lineEnd = text.indexOf('\n', end);
+        if (lineEnd === -1) lineEnd = text.length;
+
+        const beforeSelection = text.substring(0, lineStart);
+        const selectedLinesRaw = text.substring(lineStart, lineEnd);
+        const afterSelection = text.substring(lineEnd);
+
+        // Split selected chunk into lines and apply prefix to each
+        const lines = selectedLinesRaw.split('\n');
+        const newLines = lines.map((line, index) => {
+            if (formatType === 'list') {
+                return `- ${line}`;
+            } else {
+                return `${index + 1}. ${line}`;
+            }
+        });
+
+        const newBlock = newLines.join('\n');
+        const newText = beforeSelection + newBlock + afterSelection;
+
+        setNewMessage(newText);
+
+        // Move cursor to end of modified block
+        const newCursorPos = lineStart + newBlock.length;
+        setTimeout(() => {
+            input.focus();
+            input.setSelectionRange(newCursorPos, newCursorPos);
+        }, 0);
+        return;
+    }
+
+    // 2. Handle Inline Formats (Bold, Italic, Strike) - Keep original logic
     let newText = '';
     let newCursorPos = end;
 
@@ -71,13 +119,6 @@ export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved
         case 'strike':
             newText = text.substring(0, start) + '~~' + text.substring(start, end) + '~~' + text.substring(end);
             newCursorPos = end + 2;
-            break;
-        case 'list':
-            const before = text.substring(0, start);
-            const needsNewline = before.length > 0 && before[before.length - 1] !== '\n';
-            const prefix = needsNewline ? '\n- ' : '- ';
-            newText = before + prefix + text.substring(start);
-            newCursorPos = start + prefix.length;
             break;
         default:
             return;
@@ -163,7 +204,7 @@ export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved
             const isUserMessage = msg.sender === 'user';
             const isBotMessage = msg.sender === 'bot';
             const justification = isUserMessage ? 'justify-end' : 'justify-start';
-            const nameAlignment = isUserMessage ? 'text-right mr-2' : 'text-left ml-2';
+            const nameAlignment = isUserMessage ? 'text-right mr-2' : 'text-left';
             let senderName = msg.sender === 'user' ? 'Cliente' : msg.sender === 'bot' ? 'Indaiatuba IA' : msg.sender;
 
             let bgColor = 'bg-green-100';
@@ -183,7 +224,6 @@ export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved
                             <div className="flex flex-col">
                                 {msg.media_url && <MediaRenderer msg={msg} />}
                                 {msg.text && (
-                                    /* FIX: Wrapped ReactMarkdown in a div to handle styling */
                                     <div className={`text-sm ${msg.media_url ? 'mt-2' : ''} overflow-hidden`}>
                                         <ReactMarkdown
                                             remarkPlugins={[remarkGfm]}
@@ -235,9 +275,9 @@ export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved
                onChange={(e) => setNewMessage(e.target.value)}
                onKeyDown={handleKeyDown}
                placeholder={ conversation.status !== 'open' ? "Conversa encerrada" : !conversation.human_supervision ? "Assuma a conversa para enviar mensagens" : attachedFile ? "Adicione uma legenda (opcional)" : "Digite uma mensagem (Shift+Enter para pular linha)" }
-               className="flex-grow bg-transparent focus:outline-none text-gray-700 resize-none py-2 px-2 max-h-48 overflow-y-auto"
+               className="flex-grow bg-transparent focus:outline-none text-gray-700 resize-none py-2 px-2 max-h-48"
                rows={1}
-               style={{ minHeight: '44px' }}
+               style={{ minHeight: '44px', overflowY: 'hidden' }}
                disabled={conversation.status !== 'open' || !conversation.human_supervision}
              />
 
@@ -259,6 +299,9 @@ export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved
                   <div className="w-px h-4 bg-gray-300 mx-2"></div>
                   <button onClick={() => insertFormat('list')} className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded transition-colors" title="Lista (- item)">
                       <ListIcon />
+                  </button>
+                  <button onClick={() => insertFormat('ordered-list')} className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded transition-colors" title="Lista Numerada (1. item)">
+                      <OrderedListIcon />
                   </button>
                   <span className="flex-grow"></span>
                   <span className="text-[10px] text-gray-400 select-none">Markdown Suportado</span>
