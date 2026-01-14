@@ -8,13 +8,13 @@ import ChatWindow from './components/ChatWindow.jsx';
 import ConfirmationModal from './components/ConfirmationModal.jsx';
 import UserManagement from './components/UserManagement.jsx';
 
-// const API_BASE_URL = '/api'; // The path we defined in the reverse proxy config
+const API_BASE_URL = '/api'; // The path we defined in the reverse proxy config
 
 // Logic to determine WebSocket protocol
-// const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-// const WEBSOCKET_URL = `${wsProtocol}//${window.location.host}/ws`;
-const API_BASE_URL = 'http://localhost:8000';
-const WEBSOCKET_URL = 'ws://localhost:8000/ws';
+const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+const WEBSOCKET_URL = `${wsProtocol}//${window.location.host}/ws`;
+// const API_BASE_URL = 'http://localhost:8000';
+// const WEBSOCKET_URL = 'ws://localhost:8000/ws';
 
 const getUserFromToken = (token) => {
     if (!token) return null;
