@@ -205,7 +205,9 @@ export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved
             const isBotMessage = msg.sender === 'bot';
             const justification = isUserMessage ? 'justify-end' : 'justify-start';
             const nameAlignment = isUserMessage ? 'text-right mr-2' : 'text-left';
-            let senderName = msg.sender === 'user' ? 'Cliente' : msg.sender === 'bot' ? 'Indaiatuba IA' : msg.sender;
+            let senderName = msg.sender === 'user'
+                ? (conversation.user_name || 'Cliente')
+                : msg.sender === 'bot' ? 'Indaiatuba IA' : msg.sender;
 
             let bgColor = 'bg-green-100';
             if (isUserMessage) {
