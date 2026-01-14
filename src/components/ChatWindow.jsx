@@ -10,6 +10,13 @@ const TakeOverIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" width="24" 
 const PaperclipIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg> );
 const DownloadIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5 mr-2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg> );
 
+// --- FORMATTING ICONS ---
+const BoldIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 4h8a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"></path><path d="M6 12h9a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"></path></svg> );
+const ItalicIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="19" y1="4" x2="10" y2="4"></line><line x1="14" y1="20" x2="5" y2="20"></line><line x1="15" y1="4" x2="9" y2="20"></line></svg> );
+const StrikeIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M17.3 19c-1.4 1.3-3.2 2-5.3 2-4.4 0-8-3.6-8-8 0-1.8.6-3.5 1.7-4.8"></path><path d="M10.3 4.2c1.1-.2 2.3-.2 3.4 0 4.4.7 7.7 4.5 7.7 8.8 0 1.2-.2 2.3-.5 3.3"></path><line x1="4" y1="12" x2="20" y2="12"></line></svg> );
+const ListIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg> );
+
+
 // --- Media Renderer Component ---
 const MediaRenderer = ({ msg }) => {
     switch (msg.content_type) {
@@ -31,6 +38,7 @@ export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved
   const [attachedFile, setAttachedFile] = useState(null);
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
+  const textInputRef = useRef(null);
   const allSupervisionTypes = ["Social", "Administração", "Esporte, Cultura e Artes"];
 
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [conversation]);
@@ -39,6 +47,55 @@ export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved
   const handleSend = () => { if (newMessage.trim() || attachedFile) { onSendMessage({ text: newMessage, file: attachedFile }); setNewMessage(''); setAttachedFile(null); } };
   const handleFileChange = (e) => { if (e.target.files && e.target.files[0]) { setAttachedFile(e.target.files[0]); } };
   const handleTypeChange = (e) => { const newType = e.target.value; if (newType) { onInitiateTransfer(conversation.composite_id, newType); e.target.value = ""; } };
+
+  // Helper function to insert markdown at cursor position
+  const insertFormat = (formatType) => {
+    const input = textInputRef.current;
+    if (!input) return;
+
+    const start = input.selectionStart;
+    const end = input.selectionEnd;
+    const text = newMessage;
+    let newText = '';
+    let newCursorPos = end;
+
+    switch (formatType) {
+        case 'bold':
+            newText = text.substring(0, start) + '**' + text.substring(start, end) + '**' + text.substring(end);
+            newCursorPos = end + 2;
+            break;
+        case 'italic':
+            newText = text.substring(0, start) + '*' + text.substring(start, end) + '*' + text.substring(end);
+            newCursorPos = end + 1;
+            break;
+        case 'strike':
+            newText = text.substring(0, start) + '~~' + text.substring(start, end) + '~~' + text.substring(end);
+            newCursorPos = end + 2;
+            break;
+        case 'list':
+            const before = text.substring(0, start);
+            const needsNewline = before.length > 0 && before[before.length - 1] !== '\n';
+            const prefix = needsNewline ? '\n- ' : '- ';
+            newText = before + prefix + text.substring(start);
+            newCursorPos = start + prefix.length;
+            break;
+        default:
+            return;
+    }
+
+    setNewMessage(newText);
+    setTimeout(() => {
+        input.focus();
+        input.setSelectionRange(newCursorPos, newCursorPos);
+    }, 0);
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        handleSend();
+    }
+  };
 
   if (!conversation) {
     return (
@@ -106,7 +163,7 @@ export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved
             const isUserMessage = msg.sender === 'user';
             const isBotMessage = msg.sender === 'bot';
             const justification = isUserMessage ? 'justify-end' : 'justify-start';
-            const nameAlignment = isUserMessage ? 'text-right mr-2' : 'text-left';
+            const nameAlignment = isUserMessage ? 'text-right mr-2' : 'text-left ml-2';
             let senderName = msg.sender === 'user' ? 'Cliente' : msg.sender === 'bot' ? 'Indaiatuba IA' : msg.sender;
 
             let bgColor = 'bg-green-100';
@@ -126,20 +183,23 @@ export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved
                             <div className="flex flex-col">
                                 {msg.media_url && <MediaRenderer msg={msg} />}
                                 {msg.text && (
-                                    <ReactMarkdown
-                                        remarkPlugins={[remarkGfm]}
-                                        components={{
-                                            p: ({node, ...props}) => <p className="mb-2 last:mb-0 whitespace-pre-wrap" {...props} />,
-                                            strong: ({node, ...props}) => <span className="font-bold" {...props} />,
-                                            em: ({node, ...props}) => <span className="italic" {...props} />,
-                                            ul: ({node, ...props}) => <ul className="list-disc ml-4 mb-2" {...props} />,
-                                            ol: ({node, ...props}) => <ol className="list-decimal ml-4 mb-2" {...props} />,
-                                            li: ({node, ...props}) => <li className="mb-1" {...props} />,
-                                            a: ({node, ...props}) => <a className="text-blue-600 underline hover:text-blue-800" target="_blank" rel="noopener noreferrer" {...props} />
-                                        }}
-                                    >
-                                        {msg.text}
-                                    </ReactMarkdown>
+                                    /* FIX: Wrapped ReactMarkdown in a div to handle styling */
+                                    <div className={`text-sm ${msg.media_url ? 'mt-2' : ''} overflow-hidden`}>
+                                        <ReactMarkdown
+                                            remarkPlugins={[remarkGfm]}
+                                            components={{
+                                                p: ({node, ...props}) => <p className="mb-2 last:mb-0 whitespace-pre-wrap" {...props} />,
+                                                strong: ({node, ...props}) => <span className="font-bold" {...props} />,
+                                                em: ({node, ...props}) => <span className="italic" {...props} />,
+                                                ul: ({node, ...props}) => <ul className="list-disc ml-4 mb-2" {...props} />,
+                                                ol: ({node, ...props}) => <ol className="list-decimal ml-4 mb-2" {...props} />,
+                                                li: ({node, ...props}) => <li className="mb-1" {...props} />,
+                                                a: ({node, ...props}) => <a className="text-blue-600 underline hover:text-blue-800" target="_blank" rel="noopener noreferrer" {...props} />
+                                            }}
+                                        >
+                                            {msg.text}
+                                        </ReactMarkdown>
+                                    </div>
                                 )}
                             </div>
                             <span className="text-xs text-gray-400 float-right mt-1 ml-2">{messageDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
@@ -160,14 +220,50 @@ export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved
                 <button onClick={() => setAttachedFile(null)} className="font-bold text-red-500">X</button>
             </div>
         )}
-        <div className="flex items-center bg-white rounded-full px-4 py-2 shadow-sm">
-          <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" />
-          <button onClick={() => fileInputRef.current.click()} className="mr-3 text-gray-500 hover:text-blue-500" disabled={conversation.status !== 'open' || !conversation.human_supervision}><PaperclipIcon /></button>
-          <input type="text" value={newMessage} onChange={(e) => setNewMessage(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && handleSend()}
-            placeholder={ conversation.status !== 'open' ? "Conversa encerrada" : !conversation.human_supervision ? "Assuma a conversa para enviar mensagens" : attachedFile ? "Adicione uma legenda (opcional)" : "Digite uma mensagem" }
-            className="flex-grow bg-transparent focus:outline-none text-gray-700"
-            disabled={conversation.status !== 'open' || !conversation.human_supervision} />
-          <button onClick={handleSend} className="ml-3 text-blue-500 hover:text-blue-600 transition-colors duration-200 disabled:text-gray-400" disabled={conversation.status !== 'open' || !conversation.human_supervision}><SendIcon /></button>
+
+        {/* Input Area Container */}
+        <div className="flex flex-col bg-white rounded-2xl shadow-sm border border-gray-200 focus-within:ring-2 focus-within:ring-blue-100 transition-shadow">
+
+          {/* Main Input Toolbar */}
+          <div className="flex items-end p-2">
+             <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" />
+             <button onClick={() => fileInputRef.current.click()} className="p-2 text-gray-500 hover:text-blue-500 transition-colors" disabled={conversation.status !== 'open' || !conversation.human_supervision} title="Anexar arquivo"><PaperclipIcon /></button>
+
+             <textarea
+               ref={textInputRef}
+               value={newMessage}
+               onChange={(e) => setNewMessage(e.target.value)}
+               onKeyDown={handleKeyDown}
+               placeholder={ conversation.status !== 'open' ? "Conversa encerrada" : !conversation.human_supervision ? "Assuma a conversa para enviar mensagens" : attachedFile ? "Adicione uma legenda (opcional)" : "Digite uma mensagem (Shift+Enter para pular linha)" }
+               className="flex-grow bg-transparent focus:outline-none text-gray-700 resize-none py-2 px-2 max-h-48 overflow-y-auto"
+               rows={1}
+               style={{ minHeight: '44px' }}
+               disabled={conversation.status !== 'open' || !conversation.human_supervision}
+             />
+
+             <button onClick={handleSend} className="p-2 ml-1 text-blue-500 hover:text-blue-600 transition-colors duration-200 disabled:text-gray-300" disabled={conversation.status !== 'open' || !conversation.human_supervision}><SendIcon /></button>
+          </div>
+
+          {/* Formatting Toolbar */}
+          {conversation.status === 'open' && conversation.human_supervision && (
+              <div className="flex items-center px-3 pb-2 pt-1 border-t border-gray-100 space-x-1">
+                  <button onClick={() => insertFormat('bold')} className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded transition-colors" title="Negrito (**texto**)">
+                      <BoldIcon />
+                  </button>
+                  <button onClick={() => insertFormat('italic')} className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded transition-colors" title="Itálico (*texto*)">
+                      <ItalicIcon />
+                  </button>
+                  <button onClick={() => insertFormat('strike')} className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded transition-colors" title="Tachado (~~texto~~)">
+                      <StrikeIcon />
+                  </button>
+                  <div className="w-px h-4 bg-gray-300 mx-2"></div>
+                  <button onClick={() => insertFormat('list')} className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded transition-colors" title="Lista (- item)">
+                      <ListIcon />
+                  </button>
+                  <span className="flex-grow"></span>
+                  <span className="text-[10px] text-gray-400 select-none">Markdown Suportado</span>
+              </div>
+          )}
         </div>
       </footer>
     </div>
