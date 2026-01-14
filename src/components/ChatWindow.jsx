@@ -54,11 +54,26 @@ export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved
     }
   }, [newMessage]);
 
-  const handleSend = () => { if (newMessage.trim() || attachedFile) { onSendMessage({ text: newMessage, file: attachedFile }); setNewMessage(''); setAttachedFile(null); } };
+  const handleSend = () => {
+    if (newMessage.trim() || attachedFile) {
+        let textToSend = newMessage;
+
+        // Prepend signature for the recipient (WhatsApp client)
+        if (textToSend.trim()) {
+            const nameToDisplay = currentUser.name || currentUser.username || 'Assistente';
+            textToSend = `**${nameToDisplay}:**\n\n${textToSend}`;
+        }
+
+        onSendMessage({ text: textToSend, file: attachedFile });
+        setNewMessage('');
+        setAttachedFile(null);
+    }
+  };
+
   const handleFileChange = (e) => { if (e.target.files && e.target.files[0]) { setAttachedFile(e.target.files[0]); } };
   const handleTypeChange = (e) => { const newType = e.target.value; if (newType) { onInitiateTransfer(conversation.composite_id, newType); e.target.value = ""; } };
 
-  // --- IMPROVED FORMATTING LOGIC ---
+  // --- FORMATTING LOGIC ---
   const insertFormat = (formatType) => {
     const input = textInputRef.current;
     if (!input) return;
@@ -67,11 +82,9 @@ export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved
     const end = input.selectionEnd;
     const text = newMessage;
 
-    // 1. Handle Block Formats (Lists) differently to apply to full lines
+    // 1. Handle Block Formats (Lists)
     if (formatType === 'list' || formatType === 'ordered-list') {
-        // Find the start of the first line involved in selection
         let lineStart = text.lastIndexOf('\n', start - 1) + 1;
-        // Find the end of the last line involved in selection
         let lineEnd = text.indexOf('\n', end);
         if (lineEnd === -1) lineEnd = text.length;
 
@@ -79,7 +92,6 @@ export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved
         const selectedLinesRaw = text.substring(lineStart, lineEnd);
         const afterSelection = text.substring(lineEnd);
 
-        // Split selected chunk into lines and apply prefix to each
         const lines = selectedLinesRaw.split('\n');
         const newLines = lines.map((line, index) => {
             if (formatType === 'list') {
@@ -94,7 +106,6 @@ export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved
 
         setNewMessage(newText);
 
-        // Move cursor to end of modified block
         const newCursorPos = lineStart + newBlock.length;
         setTimeout(() => {
             input.focus();
@@ -103,7 +114,7 @@ export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved
         return;
     }
 
-    // 2. Handle Inline Formats (Bold, Italic, Strike) - Keep original logic
+    // 2. Handle Inline Formats
     let newText = '';
     let newCursorPos = end;
 
@@ -216,6 +227,10 @@ export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved
                 bgColor = 'bg-yellow-100';
             }
 
+            // Remove the "**Name:**\n\n" pattern from the displayed text
+            // because it is already shown in the banner (senderName)
+            const displayText = msg.text ? msg.text.replace(/^\*\*[^*]+:\*\*\s+/, '') : '';
+
             return (
               <React.Fragment key={index}>
                 {dateDivider}
@@ -239,7 +254,7 @@ export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved
                                                 a: ({node, ...props}) => <a className="text-blue-600 underline hover:text-blue-800" target="_blank" rel="noopener noreferrer" {...props} />
                                             }}
                                         >
-                                            {msg.text}
+                                            {displayText}
                                         </ReactMarkdown>
                                     </div>
                                 )}
