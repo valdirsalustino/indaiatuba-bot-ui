@@ -106,7 +106,7 @@ export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved
             const isUserMessage = msg.sender === 'user';
             const isBotMessage = msg.sender === 'bot';
             const justification = isUserMessage ? 'justify-end' : 'justify-start';
-            const nameAlignment = isUserMessage ? 'text-right mr-2' : 'text-left ml-2';
+            const nameAlignment = isUserMessage ? 'text-right mr-2' : 'text-left';
             let senderName = msg.sender === 'user' ? 'Cliente' : msg.sender === 'bot' ? 'Indaiatuba IA' : msg.sender;
 
             let bgColor = 'bg-green-100';
@@ -127,7 +127,6 @@ export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved
                                 {msg.media_url && <MediaRenderer msg={msg} />}
                                 {msg.text && (
                                     <ReactMarkdown
-                                        className={`text-sm ${msg.media_url ? 'mt-2' : ''} overflow-hidden`}
                                         remarkPlugins={[remarkGfm]}
                                         components={{
                                             p: ({node, ...props}) => <p className="mb-2 last:mb-0 whitespace-pre-wrap" {...props} />,
