@@ -1,7 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import UserIcon from './UserIcon.jsx';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import ReactQuill from 'react-quill';
+import 'react-quill/dist/quill.snow.css'; // Import Quill styles
 
 // --- ICONS ---
 const SendIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg> );
@@ -9,13 +11,6 @@ const SolvedIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" width="24" he
 const TakeOverIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6 text-gray-500 hover:text-blue-500" title="Falar diretamente com o cliente."><path d="M3 18v-6a9 9 0 0 1 18 0v6"></path><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"></path></svg> );
 const PaperclipIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg> );
 const DownloadIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5 mr-2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg> );
-
-// --- FORMATTING ICONS ---
-const BoldIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 4h8a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"></path><path d="M6 12h9a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"></path></svg> );
-const ItalicIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="19" y1="4" x2="10" y2="4"></line><line x1="14" y1="20" x2="5" y2="20"></line><line x1="15" y1="4" x2="9" y2="20"></line></svg> );
-const StrikeIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M17.3 19c-1.4 1.3-3.2 2-5.3 2-4.4 0-8-3.6-8-8 0-1.8.6-3.5 1.7-4.8"></path><path d="M10.3 4.2c1.1-.2 2.3-.2 3.4 0 4.4.7 7.7 4.5 7.7 8.8 0 1.2-.2 2.3-.5 3.3"></path><line x1="4" y1="12" x2="20" y2="12"></line></svg> );
-const ListIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg> );
-const OrderedListIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="10" y1="6" x2="21" y2="6"></line><line x1="10" y1="12" x2="21" y2="12"></line><line x1="10" y1="18" x2="21" y2="18"></line><path d="M4 6h1v4"></path><path d="M4 10h2"></path><path d="M6 18H4c0-1 2-2 2-3s-1-1.5-2-1"></path></svg> );
 
 // --- Media Renderer Component ---
 const MediaRenderer = ({ msg }) => {
@@ -34,120 +29,140 @@ const MediaRenderer = ({ msg }) => {
 };
 
 export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved, onInitiateTransfer, onTakeOver, currentUser }) {
-  const [newMessage, setNewMessage] = useState('');
+  const [editorHtml, setEditorHtml] = useState('');
   const [attachedFile, setAttachedFile] = useState(null);
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
-  const textInputRef = useRef(null);
+  const quillRef = useRef(null); // Reference to the Quill instance
   const allSupervisionTypes = ["Social", "Administração", "Esporte, Cultura e Artes"];
 
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [conversation]);
-  useEffect(() => { setNewMessage(''); setAttachedFile(null); }, [conversation?.composite_id]);
 
-  // --- Auto-Resize Logic ---
+  // Clear editor when conversation changes
   useEffect(() => {
-    if (textInputRef.current) {
-        textInputRef.current.style.height = 'auto';
-        const newHeight = Math.min(textInputRef.current.scrollHeight, 160);
-        textInputRef.current.style.height = `${newHeight}px`;
-        textInputRef.current.style.overflowY = textInputRef.current.scrollHeight > 160 ? 'auto' : 'hidden';
-    }
-  }, [newMessage]);
+      setEditorHtml('');
+      setAttachedFile(null);
+  }, [conversation?.composite_id]);
+
+  // --- HTML TO MARKDOWN CONVERTER ---
+  // This robustly handles styles from Word (fontWeight, fontStyle) and converts to Markdown
+  const htmlToMarkdown = (html) => {
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = html;
+
+    const walk = (node) => {
+        let out = '';
+        if (node.nodeType === 3) return node.textContent; // Text node
+        if (node.nodeType !== 1) return ''; // Skip comments
+
+        // Detect formatting via tags or CSS styles (common in Word pastes)
+        const style = node.style || {};
+        const fontWeight = style.fontWeight;
+        const fontStyle = style.fontStyle;
+        const textDecoration = style.textDecoration || '';
+
+        const isBold = ['B', 'STRONG'].includes(node.tagName) || fontWeight === 'bold' || parseInt(fontWeight) >= 700;
+        const isItalic = ['I', 'EM'].includes(node.tagName) || fontStyle === 'italic';
+        const isStrike = ['S', 'STRIKE'].includes(node.tagName) || textDecoration.includes('line-through');
+
+        // Process children
+        node.childNodes.forEach(child => {
+            out += walk(child);
+        });
+
+        // Apply formatting
+        // We trim content inside marks to ensure standard markdown compliance (e.g. **text** not ** text **)
+        if (isBold && out.trim()) out = `**${out.trim()}** `;
+        if (isItalic && out.trim()) out = `*${out.trim()}* `;
+        if (isStrike && out.trim()) out = `~~${out.trim()}~~ `;
+
+        // Block level elements
+        if (node.tagName === 'P') return out.trim() ? `${out}\n\n` : '';
+        if (node.tagName === 'BR') return '\n';
+        if (node.tagName === 'LI') {
+            const parent = node.parentElement;
+            if (parent && parent.tagName === 'OL') {
+                // Calculate index
+                const index = Array.from(parent.children).indexOf(node) + 1;
+                return `${index}. ${out.trim()}\n`;
+            }
+            return `- ${out.trim()}\n`;
+        }
+        if (node.tagName === 'UL' || node.tagName === 'OL') return `${out}\n`;
+        if (node.tagName === 'DIV') return out.trim() ? `${out}\n` : '';
+
+        return out;
+    };
+
+    let markdown = walk(tempDiv);
+    // Cleanup excessive newlines
+    return markdown.replace(/\n\s*\n\s*\n/g, '\n\n').trim();
+  };
 
   const handleSend = () => {
-    if (newMessage.trim() || attachedFile) {
-        let textToSend = newMessage;
+    // Check if there is text (stripping HTML tags to check for empty content)
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = editorHtml;
+    const textContent = tempDiv.textContent || tempDiv.innerText || '';
 
-        // Prepend signature for the recipient (WhatsApp client)
-        if (textToSend.trim()) {
+    if (textContent.trim() || attachedFile) {
+        let textToSend = '';
+
+        if (textContent.trim()) {
+            const markdown = htmlToMarkdown(editorHtml);
+
+            // --- SIGNATURE LOGIC ---
             const nameToDisplay = currentUser.name || currentUser.username || 'Assistente';
-            textToSend = `**${nameToDisplay}:**\n\n${textToSend}`;
+            textToSend = `**${nameToDisplay}:**\n\n${markdown}`;
         }
 
         onSendMessage({ text: textToSend, file: attachedFile });
-        setNewMessage('');
+        setEditorHtml('');
         setAttachedFile(null);
     }
+  };
+
+  // Setup Quill modules (Toolbar & Keyboard bindings)
+  const modules = useMemo(() => ({
+    toolbar: [
+      ['bold', 'italic', 'strike'],
+      [{ 'list': 'ordered'}, { 'list': 'bullet' }]
+    ],
+    keyboard: {
+        bindings: {
+            // Capture Enter (key 13) without Shift
+            enter: {
+                key: 13,
+                shiftKey: false,
+                handler: () => {
+                    // We need to call the function from the ref to ensure we have the latest state if needed
+                    // But here we can't access handleSend directly if it depends on changing state easily
+                    // without a ref. However, since handleSend is defined in the component,
+                    // we trigger a click on the send button programmatically or use a ref for the handler.
+                    // Simplest approach: trigger the send button or use a separate ref for the handler.
+
+                    // We will just let the onKeyDown on the wrapper handle it to avoid closure staleness issues
+                    // in the complex Quill configuration.
+                    return true; // Let the event propagate to the wrapper
+                }
+            }
+        }
+    }
+  }), []);
+
+  // Custom key handler to intercept Enter on the wrapper div
+  // Quill captures Enter, so we actually need to rely on the module or a custom capture.
+  // The most reliable way in ReactQuill for "Enter to Send" is intercepting onKeyDown in the component props.
+  const handleKeyDown = (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          handleSend();
+      }
   };
 
   const handleFileChange = (e) => { if (e.target.files && e.target.files[0]) { setAttachedFile(e.target.files[0]); } };
   const handleTypeChange = (e) => { const newType = e.target.value; if (newType) { onInitiateTransfer(conversation.composite_id, newType); e.target.value = ""; } };
 
-  // --- FORMATTING LOGIC ---
-  const insertFormat = (formatType) => {
-    const input = textInputRef.current;
-    if (!input) return;
-
-    const start = input.selectionStart;
-    const end = input.selectionEnd;
-    const text = newMessage;
-
-    // 1. Handle Block Formats (Lists)
-    if (formatType === 'list' || formatType === 'ordered-list') {
-        let lineStart = text.lastIndexOf('\n', start - 1) + 1;
-        let lineEnd = text.indexOf('\n', end);
-        if (lineEnd === -1) lineEnd = text.length;
-
-        const beforeSelection = text.substring(0, lineStart);
-        const selectedLinesRaw = text.substring(lineStart, lineEnd);
-        const afterSelection = text.substring(lineEnd);
-
-        const lines = selectedLinesRaw.split('\n');
-        const newLines = lines.map((line, index) => {
-            if (formatType === 'list') {
-                return `- ${line}`;
-            } else {
-                return `${index + 1}. ${line}`;
-            }
-        });
-
-        const newBlock = newLines.join('\n');
-        const newText = beforeSelection + newBlock + afterSelection;
-
-        setNewMessage(newText);
-
-        const newCursorPos = lineStart + newBlock.length;
-        setTimeout(() => {
-            input.focus();
-            input.setSelectionRange(newCursorPos, newCursorPos);
-        }, 0);
-        return;
-    }
-
-    // 2. Handle Inline Formats
-    let newText = '';
-    let newCursorPos = end;
-
-    switch (formatType) {
-        case 'bold':
-            newText = text.substring(0, start) + '**' + text.substring(start, end) + '**' + text.substring(end);
-            newCursorPos = end + 2;
-            break;
-        case 'italic':
-            newText = text.substring(0, start) + '*' + text.substring(start, end) + '*' + text.substring(end);
-            newCursorPos = end + 1;
-            break;
-        case 'strike':
-            newText = text.substring(0, start) + '~~' + text.substring(start, end) + '~~' + text.substring(end);
-            newCursorPos = end + 2;
-            break;
-        default:
-            return;
-    }
-
-    setNewMessage(newText);
-    setTimeout(() => {
-        input.focus();
-        input.setSelectionRange(newCursorPos, newCursorPos);
-    }, 0);
-  };
-
-  const handleKeyDown = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        handleSend();
-    }
-  };
 
   if (!conversation) {
     return (
@@ -163,6 +178,7 @@ export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved
   const needsAttention = conversation.status === 'open' && conversation.human_supervision;
   let lastMessageDate = null;
   const availableTypes = allSupervisionTypes.filter( (type) => type !== conversation.human_supervision_type );
+  const isInputDisabled = conversation.status !== 'open' || !conversation.human_supervision;
 
   return (
     <div className="flex-grow flex flex-col bg-gray-100">
@@ -227,8 +243,6 @@ export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved
                 bgColor = 'bg-yellow-100';
             }
 
-            // Remove the "**Name:**\n\n" pattern from the displayed text
-            // because it is already shown in the banner (senderName)
             const displayText = msg.text ? msg.text.replace(/^\*\*[^*]+:\*\*\s+/, '') : '';
 
             return (
@@ -278,52 +292,57 @@ export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved
             </div>
         )}
 
-        {/* Input Area Container */}
         <div className="flex flex-col bg-white rounded-2xl shadow-sm border border-gray-200 focus-within:ring-2 focus-within:ring-blue-100 transition-shadow">
-
-          {/* Main Input Toolbar */}
-          <div className="flex items-end p-2">
+          <div className="flex items-end p-2 relative">
              <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" />
-             <button onClick={() => fileInputRef.current.click()} className="p-2 text-gray-500 hover:text-blue-500 transition-colors" disabled={conversation.status !== 'open' || !conversation.human_supervision} title="Anexar arquivo"><PaperclipIcon /></button>
+             <button onClick={() => fileInputRef.current.click()} className="p-2 text-gray-500 hover:text-blue-500 transition-colors self-end mb-2" disabled={isInputDisabled} title="Anexar arquivo"><PaperclipIcon /></button>
 
-             <textarea
-               ref={textInputRef}
-               value={newMessage}
-               onChange={(e) => setNewMessage(e.target.value)}
-               onKeyDown={handleKeyDown}
-               placeholder={ conversation.status !== 'open' ? "Conversa encerrada" : !conversation.human_supervision ? "Assuma a conversa para enviar mensagens" : attachedFile ? "Adicione uma legenda (opcional)" : "Digite uma mensagem (Shift+Enter para pular linha)" }
-               className="flex-grow bg-transparent focus:outline-none text-gray-700 resize-none py-2 px-2 max-h-48"
-               rows={1}
-               style={{ minHeight: '44px', overflowY: 'hidden' }}
-               disabled={conversation.status !== 'open' || !conversation.human_supervision}
-             />
+             {/* EDITOR CONTAINER */}
+             <div className="flex-grow mx-2" style={{ maxWidth: 'calc(100% - 80px)' }} onKeyDown={handleKeyDown}>
+                {!isInputDisabled ? (
+                    <ReactQuill
+                        ref={quillRef}
+                        theme="snow"
+                        value={editorHtml}
+                        onChange={setEditorHtml}
+                        modules={modules}
+                        placeholder={attachedFile ? "Adicione uma legenda (opcional)" : "Digite uma mensagem"}
+                        className="custom-quill-editor"
+                    />
+                ) : (
+                    <div className="p-3 text-gray-400 italic bg-gray-50 rounded">
+                        {conversation.status !== 'open' ? "Conversa encerrada" : "Assuma a conversa para enviar mensagens"}
+                    </div>
+                )}
+             </div>
 
-             <button onClick={handleSend} className="p-2 ml-1 text-blue-500 hover:text-blue-600 transition-colors duration-200 disabled:text-gray-300" disabled={conversation.status !== 'open' || !conversation.human_supervision}><SendIcon /></button>
+             <button onClick={handleSend} className="p-2 ml-1 text-blue-500 hover:text-blue-600 transition-colors duration-200 disabled:text-gray-300 self-end mb-2" disabled={isInputDisabled}><SendIcon /></button>
           </div>
 
-          {/* Formatting Toolbar */}
-          {conversation.status === 'open' && conversation.human_supervision && (
-              <div className="flex items-center px-3 pb-2 pt-1 border-t border-gray-100 space-x-1">
-                  <button onClick={() => insertFormat('bold')} className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded transition-colors" title="Negrito (**texto**)">
-                      <BoldIcon />
-                  </button>
-                  <button onClick={() => insertFormat('italic')} className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded transition-colors" title="Itálico (*texto*)">
-                      <ItalicIcon />
-                  </button>
-                  <button onClick={() => insertFormat('strike')} className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded transition-colors" title="Tachado (~~texto~~)">
-                      <StrikeIcon />
-                  </button>
-                  <div className="w-px h-4 bg-gray-300 mx-2"></div>
-                  <button onClick={() => insertFormat('list')} className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded transition-colors" title="Lista (- item)">
-                      <ListIcon />
-                  </button>
-                  <button onClick={() => insertFormat('ordered-list')} className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded transition-colors" title="Lista Numerada (1. item)">
-                      <OrderedListIcon />
-                  </button>
-                  <span className="flex-grow"></span>
-                  <span className="text-[10px] text-gray-400 select-none">Markdown Suportado</span>
-              </div>
-          )}
+          {/* Custom Styles for Quill to match the previous look (Rounded, No Border) */}
+          <style>{`
+            .custom-quill-editor .ql-container {
+                border: none !important;
+                font-family: inherit;
+                font-size: 0.875rem; /* text-sm */
+            }
+            .custom-quill-editor .ql-toolbar {
+                border: none !important;
+                border-bottom: 1px solid #f3f4f6 !important; /* light gray divider */
+                padding: 4px 0px;
+            }
+            .custom-quill-editor .ql-editor {
+                min-height: 44px;
+                max-height: 160px; /* Limit height like previous textarea */
+                overflow-y: auto;
+                padding: 8px 0px;
+            }
+            .custom-quill-editor .ql-editor.ql-blank::before {
+                color: #9ca3af; /* placeholder color */
+                font-style: normal;
+                left: 0;
+            }
+          `}</style>
         </div>
       </footer>
     </div>
