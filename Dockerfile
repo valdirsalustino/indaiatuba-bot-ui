@@ -7,6 +7,9 @@ WORKDIR /app
 # Copy package.json and package-lock.json
 COPY package.json package-lock.json ./
 
+# Update npm to the latest version to supress the notice
+RUN npm install -g npm@latest
+
 # Install dependencies securely
 RUN npm ci
 
