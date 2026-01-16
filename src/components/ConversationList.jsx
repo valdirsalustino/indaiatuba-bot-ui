@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import UserIcon from './UserIcon';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 // --- ICONS (Added SearchIcon) ---
 const SearchIcon = () => (
@@ -60,7 +62,6 @@ export default function ConversationList({ conversations, onSelect, selectedId, 
     }
 
     // Check if any message text includes the query
-    // This assumes `conv.messages` is available. If not, this part needs adjustment based on available data.
     if (conv.messages && Array.isArray(conv.messages)) {
         return conv.messages.some(msg => msg.text && msg.text.toLowerCase().includes(query));
     }
@@ -108,6 +109,7 @@ export default function ConversationList({ conversations, onSelect, selectedId, 
         {filteredConversations.map(conv => {
           const needsAttention = conv.status === 'open' && conv.human_supervision;
           const isClosed = conv.status !== 'open';
+          const textStyle = isClosed ? 'italic text-gray-400' : needsAttention ? 'text-red-600 font-bold' : 'text-gray-500';
 
           return (
             <div
@@ -132,9 +134,25 @@ export default function ConversationList({ conversations, onSelect, selectedId, 
                   </div>
                   <span className="text-xs text-gray-400 flex-shrink-0 ml-2">{formatDisplayDate(conv.last_updated)}</span>
                 </div>
-                <p className={`text-sm truncate ${isClosed ? 'italic text-gray-400' : needsAttention ? 'text-red-600 font-bold' : 'text-gray-500'}`}>
-                  {isClosed ? `Tópico encerrado (${conv.status.split('_').pop()})` : conv.last_message}
-                </p>
+
+                {/* --- RENDER LAST MESSAGE AS MARKDOWN --- */}
+                <div className={`text-sm truncate ${textStyle}`}>
+                    {isClosed ? (
+                        `Tópico encerrado (${conv.status.split('_').pop()})`
+                    ) : (
+                        <ReactMarkdown
+                            remarkPlugins={[remarkGfm]}
+                            disallowedElements={['p']} // Prevent <p> tags so it stays inline
+                            unwrapDisallowed={true} // Unwrap content from disallowed elements
+                            components={{
+                                a: ({node, ...props}) => <span {...props} />, // Disable links in preview
+                            }}
+                        >
+                            {conv.last_message || ''}
+                        </ReactMarkdown>
+                    )}
+                </div>
+
               </div>
             </div>
           )
