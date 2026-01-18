@@ -2,8 +2,8 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import UserIcon from './UserIcon.jsx';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import ReactQuill from 'react-quill';
-import 'react-quill/dist/quill.snow.css'; // Import Quill styles
+import ReactQuill from 'react-quill-new'; // Updated import
+import 'react-quill-new/dist/quill.snow.css'; // Updated CSS import
 import TurndownService from 'turndown';
 import { gfm } from 'turndown-plugin-gfm';
 
@@ -229,7 +229,9 @@ export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved
                 bgColor = 'bg-yellow-100';
             }
 
-            const displayText = msg.text ? msg.text.replace(/^\*\*[^*]+:\*\*\s+/, '') : '';
+            const displayText = msg.text
+                ? msg.text.replace(/^\*\*[^*]+:\*\*\s+/, '').replace(/\u00A0/g, ' ')
+                : '';
 
             return (
               <React.Fragment key={index}>
@@ -245,12 +247,13 @@ export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved
                                         <ReactMarkdown
                                             remarkPlugins={[remarkGfm]}
                                             components={{
-                                                p: ({node, ...props}) => <p className="mb-2 last:mb-0 whitespace-pre-wrap" {...props} />,
+                                                // Added 'break-words' to p and li classes
+                                                p: ({node, ...props}) => <p className="mb-2 last:mb-0 whitespace-pre-wrap break-words" {...props} />,
                                                 strong: ({node, ...props}) => <span className="font-bold" {...props} />,
                                                 em: ({node, ...props}) => <span className="italic" {...props} />,
                                                 ul: ({node, ...props}) => <ul className="list-disc ml-4 mb-2" {...props} />,
                                                 ol: ({node, ...props}) => <ol className="list-decimal ml-4 mb-2" {...props} />,
-                                                li: ({node, ...props}) => <li className="mb-1" {...props} />,
+                                                li: ({node, ...props}) => <li className="mb-1 break-words" {...props} />,
                                                 a: ({node, ...props}) => <a className="text-blue-600 underline hover:text-blue-800" target="_blank" rel="noopener noreferrer" {...props} />
                                             }}
                                         >
