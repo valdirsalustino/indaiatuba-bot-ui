@@ -4,6 +4,8 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css'; // Import Quill styles
+import TurndownService from 'turndown';
+import { gfm } from 'turndown-plugin-gfm';
 
 // --- ICONS ---
 const SendIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg> );
@@ -33,8 +35,60 @@ export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved
   const [attachedFile, setAttachedFile] = useState(null);
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
-  const quillRef = useRef(null); // Reference to the Quill instance
+  const quillRef = useRef(null);
   const allSupervisionTypes = ["Social", "Administração", "Esporte, Cultura e Artes"];
+
+  // --- TURNDOWN SERVICE SETUP ---
+  const turndownService = useMemo(() => {
+    const service = new TurndownService({
+        headingStyle: 'atx', // Use # for headings instead of underlining
+        codeBlockStyle: 'fenced', // Use ``` for code blocks
+        bulletListMarker: '-', // Use - for bullet points
+        strongDelimiter: '**' // Use ** for bold (Standard Markdown)
+    });
+
+    // Use GFM plugin for Strikethrough (~~), Tables, etc.
+    service.use(gfm);
+
+    // Custom Rules to handle inline styles from Quill (e.g. <span style="font-weight: bold">)
+    service.addRule('styledBold', {
+        filter: function (node) {
+            return (
+                node.nodeName === 'SPAN' &&
+                (node.style.fontWeight === 'bold' || parseInt(node.style.fontWeight) >= 700)
+            );
+        },
+        replacement: function (content) {
+            return '**' + content + '**';
+        }
+    });
+
+    service.addRule('styledItalic', {
+        filter: function (node) {
+            return (
+                node.nodeName === 'SPAN' &&
+                (node.style.fontStyle === 'italic')
+            );
+        },
+        replacement: function (content) {
+            return '_' + content + '_';
+        }
+    });
+
+    service.addRule('styledStrike', {
+        filter: function (node) {
+            return (
+                node.nodeName === 'SPAN' &&
+                (node.style.textDecoration.includes('line-through'))
+            );
+        },
+        replacement: function (content) {
+            return '~~' + content + '~~';
+        }
+    });
+
+    return service;
+  }, []);
 
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [conversation]);
 
@@ -43,61 +97,6 @@ export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved
       setEditorHtml('');
       setAttachedFile(null);
   }, [conversation?.composite_id]);
-
-  // --- HTML TO MARKDOWN CONVERTER ---
-  // This robustly handles styles from Word (fontWeight, fontStyle) and converts to Markdown
-  const htmlToMarkdown = (html) => {
-    const tempDiv = document.createElement('div');
-    tempDiv.innerHTML = html;
-
-    const walk = (node) => {
-        let out = '';
-        if (node.nodeType === 3) return node.textContent; // Text node
-        if (node.nodeType !== 1) return ''; // Skip comments
-
-        // Detect formatting via tags or CSS styles (common in Word pastes)
-        const style = node.style || {};
-        const fontWeight = style.fontWeight;
-        const fontStyle = style.fontStyle;
-        const textDecoration = style.textDecoration || '';
-
-        const isBold = ['B', 'STRONG'].includes(node.tagName) || fontWeight === 'bold' || parseInt(fontWeight) >= 700;
-        const isItalic = ['I', 'EM'].includes(node.tagName) || fontStyle === 'italic';
-        const isStrike = ['S', 'STRIKE'].includes(node.tagName) || textDecoration.includes('line-through');
-
-        // Process children
-        node.childNodes.forEach(child => {
-            out += walk(child);
-        });
-
-        // Apply formatting
-        // We trim content inside marks to ensure standard markdown compliance (e.g. **text** not ** text **)
-        if (isBold && out.trim()) out = `**${out.trim()}** `;
-        if (isItalic && out.trim()) out = `*${out.trim()}* `;
-        if (isStrike && out.trim()) out = `~~${out.trim()}~~ `;
-
-        // Block level elements
-        if (node.tagName === 'P') return out.trim() ? `${out}\n\n` : '';
-        if (node.tagName === 'BR') return '\n';
-        if (node.tagName === 'LI') {
-            const parent = node.parentElement;
-            if (parent && parent.tagName === 'OL') {
-                // Calculate index
-                const index = Array.from(parent.children).indexOf(node) + 1;
-                return `${index}. ${out.trim()}\n`;
-            }
-            return `- ${out.trim()}\n`;
-        }
-        if (node.tagName === 'UL' || node.tagName === 'OL') return `${out}\n`;
-        if (node.tagName === 'DIV') return out.trim() ? `${out}\n` : '';
-
-        return out;
-    };
-
-    let markdown = walk(tempDiv);
-    // Cleanup excessive newlines
-    return markdown.replace(/\n\s*\n\s*\n/g, '\n\n').trim();
-  };
 
   const handleSend = () => {
     // Check if there is text (stripping HTML tags to check for empty content)
@@ -109,7 +108,8 @@ export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved
         let textToSend = '';
 
         if (textContent.trim()) {
-            const markdown = htmlToMarkdown(editorHtml);
+            // Convert HTML to Markdown using Turndown
+            const markdown = turndownService.turndown(editorHtml);
 
             // --- SIGNATURE LOGIC ---
             const nameToDisplay = currentUser.name || currentUser.username || 'Assistente';
@@ -130,29 +130,15 @@ export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved
     ],
     keyboard: {
         bindings: {
-            // Capture Enter (key 13) without Shift
             enter: {
                 key: 13,
                 shiftKey: false,
-                handler: () => {
-                    // We need to call the function from the ref to ensure we have the latest state if needed
-                    // But here we can't access handleSend directly if it depends on changing state easily
-                    // without a ref. However, since handleSend is defined in the component,
-                    // we trigger a click on the send button programmatically or use a ref for the handler.
-                    // Simplest approach: trigger the send button or use a separate ref for the handler.
-
-                    // We will just let the onKeyDown on the wrapper handle it to avoid closure staleness issues
-                    // in the complex Quill configuration.
-                    return true; // Let the event propagate to the wrapper
-                }
+                handler: () => { return true; } // Let the event propagate to wrapper
             }
         }
     }
   }), []);
 
-  // Custom key handler to intercept Enter on the wrapper div
-  // Quill captures Enter, so we actually need to rely on the module or a custom capture.
-  // The most reliable way in ReactQuill for "Enter to Send" is intercepting onKeyDown in the component props.
   const handleKeyDown = (e) => {
       if (e.key === 'Enter' && !e.shiftKey) {
           e.preventDefault();
@@ -216,7 +202,7 @@ export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved
         </div>
       </header>
 
-      <div className="flex-grow p-6 overflow-y-auto bg-cover bg-center" style={{ backgroundImage: "url('https://i.pinimg.com/736x/8c/98/99/8c98994518b575bfd8c949e91d20548b.jpg')" }}>
+      <div className="flex-grow p-6 overflow-y-auto bg-cover bg-center" style={{ backgroundImage: "url('[https://i.pinimg.com/736x/8c/98/99/8c98994518b575bfd8c949e91d20548b.jpg](https://i.pinimg.com/736x/8c/98/99/8c98994518b575bfd8c949e91d20548b.jpg)')" }}>
         <div className="flex flex-col space-y-2">
           {conversation.messages.map((msg, index) => {
             const messageDate = new Date(msg.timestamp);
@@ -319,26 +305,25 @@ export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved
              <button onClick={handleSend} className="p-2 ml-1 text-blue-500 hover:text-blue-600 transition-colors duration-200 disabled:text-gray-300 self-end mb-2" disabled={isInputDisabled}><SendIcon /></button>
           </div>
 
-          {/* Custom Styles for Quill to match the previous look (Rounded, No Border) */}
           <style>{`
             .custom-quill-editor .ql-container {
                 border: none !important;
                 font-family: inherit;
-                font-size: 0.875rem; /* text-sm */
+                font-size: 0.875rem;
             }
             .custom-quill-editor .ql-toolbar {
                 border: none !important;
-                border-bottom: 1px solid #f3f4f6 !important; /* light gray divider */
+                border-bottom: 1px solid #f3f4f6 !important;
                 padding: 4px 0px;
             }
             .custom-quill-editor .ql-editor {
                 min-height: 44px;
-                max-height: 160px; /* Limit height like previous textarea */
+                max-height: 160px;
                 overflow-y: auto;
                 padding: 8px 0px;
             }
             .custom-quill-editor .ql-editor.ql-blank::before {
-                color: #9ca3af; /* placeholder color */
+                color: #9ca3af;
                 font-style: normal;
                 left: 0;
             }
