@@ -2,8 +2,8 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import UserIcon from './UserIcon.jsx';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import ReactQuill from 'react-quill-new'; // Updated import
-import 'react-quill-new/dist/quill.snow.css'; // Updated CSS import
+import ReactQuill from 'react-quill-new';
+import 'react-quill-new/dist/quill.snow.css';
 import TurndownService from 'turndown';
 import { gfm } from 'turndown-plugin-gfm';
 
@@ -41,16 +41,14 @@ export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved
   // --- TURNDOWN SERVICE SETUP ---
   const turndownService = useMemo(() => {
     const service = new TurndownService({
-        headingStyle: 'atx', // Use # for headings instead of underlining
-        codeBlockStyle: 'fenced', // Use ``` for code blocks
-        bulletListMarker: '-', // Use - for bullet points
-        strongDelimiter: '**' // Use ** for bold (Standard Markdown)
+        headingStyle: 'atx',
+        codeBlockStyle: 'fenced',
+        bulletListMarker: '-', // REVERTED: Use standard '-' for stability inside the engine
+        strongDelimiter: '**'
     });
 
-    // Use GFM plugin for Strikethrough (~~), Tables, etc.
     service.use(gfm);
 
-    // Custom Rules to handle inline styles from Quill (e.g. <span style="font-weight: bold">)
     service.addRule('styledBold', {
         filter: function (node) {
             return (
@@ -92,14 +90,12 @@ export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved
 
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [conversation]);
 
-  // Clear editor when conversation changes
   useEffect(() => {
       setEditorHtml('');
       setAttachedFile(null);
   }, [conversation?.composite_id]);
 
   const handleSend = () => {
-    // Check if there is text (stripping HTML tags to check for empty content)
     const tempDiv = document.createElement('div');
     tempDiv.innerHTML = editorHtml;
     const textContent = tempDiv.textContent || tempDiv.innerText || '';
@@ -108,10 +104,16 @@ export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved
         let textToSend = '';
 
         if (textContent.trim()) {
-            // Convert HTML to Markdown using Turndown
-            const markdown = turndownService.turndown(editorHtml);
+            // 1. Convert HTML to Markdown (Standard)
+            let markdown = turndownService.turndown(editorHtml);
 
-            // --- SIGNATURE LOGIC ---
+            // 2. Fix Non-Breaking Spaces (Wrapping Issue)
+            markdown = markdown.replace(/\u00A0/g, ' ');
+
+            // 3. WHATSAPP FIX: Convert standard list hyphens (-) to Visual Bullets (•)
+            // This Regex finds a hyphen at the start of a line (with optional indentation) and swaps it.
+            markdown = markdown.replace(/^(\s*)-\s+/gm, '$1• ');
+
             const nameToDisplay = currentUser.name || currentUser.username || 'Assistente';
             textToSend = `**${nameToDisplay}:**\n\n${markdown}`;
         }
@@ -122,7 +124,6 @@ export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved
     }
   };
 
-  // Setup Quill modules (Toolbar & Keyboard bindings)
   const modules = useMemo(() => ({
     toolbar: [
       ['bold', 'italic', 'strike'],
@@ -133,7 +134,7 @@ export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved
             enter: {
                 key: 13,
                 shiftKey: false,
-                handler: () => { return true; } // Let the event propagate to wrapper
+                handler: () => { return true; }
             }
         }
     }
@@ -202,7 +203,7 @@ export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved
         </div>
       </header>
 
-      <div className="flex-grow p-6 overflow-y-auto bg-cover bg-center" style={{ backgroundImage: "url('[https://i.pinimg.com/736x/8c/98/99/8c98994518b575bfd8c949e91d20548b.jpg](https://i.pinimg.com/736x/8c/98/99/8c98994518b575bfd8c949e91d20548b.jpg)')" }}>
+      <div className="flex-grow p-6 overflow-y-auto bg-cover bg-center" style={{ backgroundImage: "url('https://i.pinimg.com/736x/8c/98/99/8c98994518b575bfd8c949e91d20548b.jpg')" }}>
         <div className="flex flex-col space-y-2">
           {conversation.messages.map((msg, index) => {
             const messageDate = new Date(msg.timestamp);
@@ -229,8 +230,10 @@ export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved
                 bgColor = 'bg-yellow-100';
             }
 
+            // CLEAN DISPLAY TEXT: Remove bold signature and replace non-breaking spaces
+            // NOTE: We also convert standard hyphens to bullets here purely for display consistency in the Admin UI
             const displayText = msg.text
-                ? msg.text.replace(/^\*\*[^*]+:\*\*\s+/, '').replace(/\u00A0/g, ' ')
+                ? msg.text.replace(/^\*\*[^*]+:\*\*\s+/, '').replace(/\u00A0/g, ' ').replace(/^-\s+/gm, '• ')
                 : '';
 
             return (
@@ -247,7 +250,6 @@ export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved
                                         <ReactMarkdown
                                             remarkPlugins={[remarkGfm]}
                                             components={{
-                                                // Added 'break-words' to p and li classes
                                                 p: ({node, ...props}) => <p className="mb-2 last:mb-0 whitespace-pre-wrap break-words" {...props} />,
                                                 strong: ({node, ...props}) => <span className="font-bold" {...props} />,
                                                 em: ({node, ...props}) => <span className="italic" {...props} />,
@@ -273,6 +275,7 @@ export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved
         </div>
       </div>
 
+      {/* Footer code remains identical to previous versions... */}
       <footer className="bg-gray-50 p-4 border-t border-gray-200">
         {attachedFile && (
             <div className="px-4 pb-2 text-sm text-gray-600 flex justify-between items-center">
