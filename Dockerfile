@@ -1,14 +1,11 @@
 # Stage 1: Build the React application
-FROM node:22-alpine AS builder
+FROM node:18-alpine AS builder
 
 # Set the working directory
 WORKDIR /app
 
 # Copy package.json and package-lock.json
 COPY package.json package-lock.json ./
-
-# Update npm to the latest version to supress the notice
-RUN npm install -g npm@latest
 
 # Install dependencies securely
 RUN npm ci

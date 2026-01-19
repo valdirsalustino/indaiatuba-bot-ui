@@ -1,7 +1,5 @@
 import React, { useState } from 'react';
 import UserIcon from './UserIcon';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
 
 // --- ICONS (Added SearchIcon) ---
 const SearchIcon = () => (
@@ -9,15 +7,15 @@ const SearchIcon = () => (
 );
 
 const LogoutIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
 );
 
 const AlertIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6 text-red-500"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6 text-red-500"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
 );
 
 const ManageUsersIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
 );
 
 const formatDisplayDate = (timestamp) => {
@@ -62,6 +60,7 @@ export default function ConversationList({ conversations, onSelect, selectedId, 
     }
 
     // Check if any message text includes the query
+    // This assumes `conv.messages` is available. If not, this part needs adjustment based on available data.
     if (conv.messages && Array.isArray(conv.messages)) {
         return conv.messages.some(msg => msg.text && msg.text.toLowerCase().includes(query));
     }
@@ -109,7 +108,6 @@ export default function ConversationList({ conversations, onSelect, selectedId, 
         {filteredConversations.map(conv => {
           const needsAttention = conv.status === 'open' && conv.human_supervision;
           const isClosed = conv.status !== 'open';
-          const textStyle = isClosed ? 'italic text-gray-400' : needsAttention ? 'text-red-600 font-bold' : 'text-gray-500';
 
           return (
             <div
@@ -123,36 +121,14 @@ export default function ConversationList({ conversations, onSelect, selectedId, 
               <div className="flex-grow overflow-hidden">
                 <div className="flex justify-between items-center">
                   <div className="flex items-center">
-                    <div className="flex flex-col">
-                        <h2 className="font-semibold text-gray-700 truncate">
-                            {conv.user_name || conv.phone_number}
-                        </h2> {conv.user_name && (
-                            <span className="text-xs text-gray-500">{conv.phone_number}</span>
-                        )}
-                    </div>
+                    <h2 className="font-semibold text-gray-700 truncate">{conv.phone_number}</h2>
                     <span className="ml-2 text-xs text-gray-500 bg-gray-200 px-2 py-0.5 rounded-full">{conv.thread_id.replace('_', ' ')}</span>
                   </div>
                   <span className="text-xs text-gray-400 flex-shrink-0 ml-2">{formatDisplayDate(conv.last_updated)}</span>
                 </div>
-
-                {/* --- RENDER LAST MESSAGE AS MARKDOWN --- */}
-                <div className={`text-sm truncate ${textStyle}`}>
-                    {isClosed ? (
-                        `Tópico encerrado (${conv.status.split('_').pop()})`
-                    ) : (
-                        <ReactMarkdown
-                            remarkPlugins={[remarkGfm]}
-                            disallowedElements={['p']} // Prevent <p> tags so it stays inline
-                            unwrapDisallowed={true} // Unwrap content from disallowed elements
-                            components={{
-                                a: ({node, ...props}) => <span {...props} />, // Disable links in preview
-                            }}
-                        >
-                            {conv.last_message || ''}
-                        </ReactMarkdown>
-                    )}
-                </div>
-
+                <p className={`text-sm truncate ${isClosed ? 'italic text-gray-400' : needsAttention ? 'text-red-600 font-bold' : 'text-gray-500'}`}>
+                  {isClosed ? `Tópico encerrado (${conv.status.split('_').pop()})` : conv.last_message}
+                </p>
               </div>
             </div>
           )
