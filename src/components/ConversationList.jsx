@@ -142,7 +142,7 @@ export default function ConversationList({ conversations, onSelect, selectedId, 
                     ) : (
                         <ReactMarkdown
                             remarkPlugins={[remarkGfm]}
-                            disallowedElements={['p']} // Prevent <p> tags so it stays inline
+                            allowedElements={['strong', 'em', 'del', 'span', 'a']} // Prevent <p> tags so it stays inline
                             unwrapDisallowed={true} // Unwrap content from disallowed elements
                             components={{
                                 a: ({node, ...props}) => <span {...props} />, // Disable links in preview
