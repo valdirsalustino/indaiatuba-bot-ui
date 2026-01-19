@@ -1,5 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import UserIcon from './UserIcon.jsx';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import ReactQuill from 'react-quill-new';
+import 'react-quill-new/dist/quill.snow.css';
+import TurndownService from 'turndown';
+import { gfm } from 'turndown-plugin-gfm';
 
 // --- ICONS ---
 const SendIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg> );
@@ -25,18 +31,125 @@ const MediaRenderer = ({ msg }) => {
 };
 
 export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved, onInitiateTransfer, onTakeOver, currentUser }) {
-  const [newMessage, setNewMessage] = useState('');
+  const [editorHtml, setEditorHtml] = useState('');
   const [attachedFile, setAttachedFile] = useState(null);
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
+  const quillRef = useRef(null);
   const allSupervisionTypes = ["Social", "Administração", "Esporte, Cultura e Artes"];
 
-  useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [conversation]);
-  useEffect(() => { setNewMessage(''); setAttachedFile(null); }, [conversation?.composite_id]);
+  // --- TURNDOWN SERVICE SETUP ---
+  const turndownService = useMemo(() => {
+    const service = new TurndownService({
+        headingStyle: 'atx',
+        codeBlockStyle: 'fenced',
+        bulletListMarker: '-', // REVERTED: Use standard '-' for stability inside the engine
+        strongDelimiter: '**'
+    });
 
-  const handleSend = () => { if (newMessage.trim() || attachedFile) { onSendMessage({ text: newMessage, file: attachedFile }); setNewMessage(''); setAttachedFile(null); } };
+    service.use(gfm);
+
+    service.addRule('styledBold', {
+        filter: function (node) {
+            return (
+                node.nodeName === 'SPAN' &&
+                (node.style.fontWeight === 'bold' || parseInt(node.style.fontWeight) >= 700)
+            );
+        },
+        replacement: function (content) {
+            return '**' + content + '**';
+        }
+    });
+
+    service.addRule('styledItalic', {
+        filter: function (node) {
+            return (
+                node.nodeName === 'SPAN' &&
+                (node.style.fontStyle === 'italic')
+            );
+        },
+        replacement: function (content) {
+            return '_' + content + '_';
+        }
+    });
+
+    service.addRule('styledStrike', {
+        filter: function (node) {
+            return (
+                node.nodeName === 'SPAN' &&
+                (node.style.textDecoration.includes('line-through'))
+            );
+        },
+        replacement: function (content) {
+            return '~~' + content + '~~';
+        }
+    });
+
+    return service;
+  }, []);
+
+  useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [conversation]);
+
+  useEffect(() => {
+      setEditorHtml('');
+      setAttachedFile(null);
+  }, [conversation?.composite_id]);
+
+  const handleSend = () => {
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = editorHtml;
+    const textContent = tempDiv.textContent || tempDiv.innerText || '';
+
+    if (textContent.trim() || attachedFile) {
+        let textToSend = '';
+
+        if (textContent.trim()) {
+            // 1. Convert HTML to Markdown (Standard)
+            let markdown = turndownService.turndown(editorHtml);
+
+            // 2. Fix Non-Breaking Spaces (Wrapping Issue)
+            markdown = markdown.replace(/\u00A0/g, ' ');
+
+            // 3. WHATSAPP FIX: Convert standard list hyphens (-) to Visual Bullets (•)
+            // This Regex finds a hyphen at the start of a line (with optional indentation) and swaps it.
+            markdown = markdown.replace(/^(\s*)-\s+/gm, '$1• ');
+
+            const nameToDisplay = currentUser.name || currentUser.username || 'Assistente';
+            textToSend = `**${nameToDisplay}:**\n\n${markdown}`;
+        }
+
+        onSendMessage({ text: textToSend, file: attachedFile });
+        setEditorHtml('');
+        setAttachedFile(null);
+    }
+  };
+
+  const modules = useMemo(() => ({
+    toolbar: [
+      ['bold', 'italic', 'strike'],
+      [{ 'list': 'ordered'}, { 'list': 'bullet' }]
+    ],
+    keyboard: {
+        bindings: {
+            enter: {
+                key: 13,
+                shiftKey: false,
+                handler: () => { return true; }
+            }
+        }
+    }
+  }), []);
+
+  const handleKeyDown = (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          handleSend();
+      }
+  };
+
   const handleFileChange = (e) => { if (e.target.files && e.target.files[0]) { setAttachedFile(e.target.files[0]); } };
   const handleTypeChange = (e) => { const newType = e.target.value; if (newType) { onInitiateTransfer(conversation.composite_id, newType); e.target.value = ""; } };
+
 
   if (!conversation) {
     return (
@@ -52,16 +165,22 @@ export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved
   const needsAttention = conversation.status === 'open' && conversation.human_supervision;
   let lastMessageDate = null;
   const availableTypes = allSupervisionTypes.filter( (type) => type !== conversation.human_supervision_type );
+  const isInputDisabled = conversation.status !== 'open' || !conversation.human_supervision;
 
   return (
     <div className="flex-grow flex flex-col bg-gray-100">
       <header className="flex items-center justify-between p-3 bg-white border-b border-gray-200 shadow-sm">
-        {/* Header is unchanged */}
         <div className="flex items-center">
             <div className="w-10 h-10 rounded-full mr-3 flex items-center justify-center bg-gray-200 flex-shrink-0"><UserIcon className="h-6 w-6 text-gray-500" /></div>
             <div>
                 <div className="flex items-center">
-                  <h2 className="font-semibold text-gray-800">{conversation.phone_number}</h2>
+                  <div className="flex flex-col">
+                      <h2 className="font-semibold text-gray-800">
+                          {conversation.user_name || conversation.phone_number}
+                      </h2> {conversation.user_name && (
+                        <span className="text-xs text-gray-500">{conversation.phone_number}</span>
+                      )}
+                  </div>
                   <span className="ml-2 text-xs text-gray-500 bg-gray-200 px-2 py-0.5 rounded-full">{conversation.thread_id.replace('_', ' ')}</span>
                 </div>
                 {needsAttention && ( <div className="text-xs text-red-600"> Departamento: {conversation.human_supervision_type}. Hora do pedido: {new Date(conversation.last_handoff_timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} </div> )}
@@ -99,8 +218,10 @@ export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved
             const isUserMessage = msg.sender === 'user';
             const isBotMessage = msg.sender === 'bot';
             const justification = isUserMessage ? 'justify-end' : 'justify-start';
-            const nameAlignment = isUserMessage ? 'text-right mr-2' : 'text-left ml-2';
-            let senderName = msg.sender === 'user' ? 'Cliente' : msg.sender === 'bot' ? 'Indaiatuba IA' : msg.sender;
+            const nameAlignment = isUserMessage ? 'text-right mr-2' : 'text-left';
+            let senderName = msg.sender === 'user'
+                ? (conversation.user_name || 'Cliente')
+                : msg.sender === 'bot' ? 'Indaiatuba IA' : msg.sender;
 
             let bgColor = 'bg-green-100';
             if (isUserMessage) {
@@ -108,6 +229,12 @@ export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved
             } else if (isBotMessage) {
                 bgColor = 'bg-yellow-100';
             }
+
+            // CLEAN DISPLAY TEXT: Remove bold signature and replace non-breaking spaces
+            // NOTE: We also convert standard hyphens to bullets here purely for display consistency in the Admin UI
+            const displayText = msg.text
+                ? msg.text.replace(/^\*\*[^*]+:\*\*\s+/, '').replace(/\u00A0/g, ' ').replace(/^-\s+/gm, '• ')
+                : '';
 
             return (
               <React.Fragment key={index}>
@@ -118,7 +245,24 @@ export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved
                         <div className={`rounded-xl px-4 py-2 shadow-md ${bgColor} text-gray-800 ${senderName ? 'rounded-t-none' : ''}`}>
                             <div className="flex flex-col">
                                 {msg.media_url && <MediaRenderer msg={msg} />}
-                                {msg.text && <p className={`whitespace-pre-wrap text-sm ${msg.media_url ? 'mt-2' : ''}`}>{msg.text}</p>}
+                                {msg.text && (
+                                    <div className={`text-sm ${msg.media_url ? 'mt-2' : ''} overflow-hidden`}>
+                                        <ReactMarkdown
+                                            remarkPlugins={[remarkGfm]}
+                                            components={{
+                                                p: ({node, ...props}) => <p className="mb-2 last:mb-0 whitespace-pre-wrap break-words" {...props} />,
+                                                strong: ({node, ...props}) => <span className="font-bold" {...props} />,
+                                                em: ({node, ...props}) => <span className="italic" {...props} />,
+                                                ul: ({node, ...props}) => <ul className="list-disc ml-4 mb-2" {...props} />,
+                                                ol: ({node, ...props}) => <ol className="list-decimal ml-4 mb-2" {...props} />,
+                                                li: ({node, ...props}) => <li className="mb-1 break-words" {...props} />,
+                                                a: ({node, ...props}) => <a className="text-blue-600 underline hover:text-blue-800" target="_blank" rel="noopener noreferrer" {...props} />
+                                            }}
+                                        >
+                                            {displayText}
+                                        </ReactMarkdown>
+                                    </div>
+                                )}
                             </div>
                             <span className="text-xs text-gray-400 float-right mt-1 ml-2">{messageDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                         </div>
@@ -131,22 +275,65 @@ export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved
         </div>
       </div>
 
+      {/* Footer code remains identical to previous versions... */}
       <footer className="bg-gray-50 p-4 border-t border-gray-200">
-        {/* Footer is unchanged */}
         {attachedFile && (
             <div className="px-4 pb-2 text-sm text-gray-600 flex justify-between items-center">
                 <span>Anexado: {attachedFile.name}</span>
                 <button onClick={() => setAttachedFile(null)} className="font-bold text-red-500">X</button>
             </div>
         )}
-        <div className="flex items-center bg-white rounded-full px-4 py-2 shadow-sm">
-          <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" />
-          <button onClick={() => fileInputRef.current.click()} className="mr-3 text-gray-500 hover:text-blue-500" disabled={conversation.status !== 'open' || !conversation.human_supervision}><PaperclipIcon /></button>
-          <input type="text" value={newMessage} onChange={(e) => setNewMessage(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && handleSend()}
-            placeholder={ conversation.status !== 'open' ? "Conversa encerrada" : !conversation.human_supervision ? "Assuma a conversa para enviar mensagens" : attachedFile ? "Adicione uma legenda (opcional)" : "Digite uma mensagem" }
-            className="flex-grow bg-transparent focus:outline-none text-gray-700"
-            disabled={conversation.status !== 'open' || !conversation.human_supervision} />
-          <button onClick={handleSend} className="ml-3 text-blue-500 hover:text-blue-600 transition-colors duration-200 disabled:text-gray-400" disabled={conversation.status !== 'open' || !conversation.human_supervision}><SendIcon /></button>
+
+        <div className="flex flex-col bg-white rounded-2xl shadow-sm border border-gray-200 focus-within:ring-2 focus-within:ring-blue-100 transition-shadow">
+          <div className="flex items-end p-2 relative">
+             <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" />
+             <button onClick={() => fileInputRef.current.click()} className="p-2 text-gray-500 hover:text-blue-500 transition-colors self-end mb-2" disabled={isInputDisabled} title="Anexar arquivo"><PaperclipIcon /></button>
+
+             {/* EDITOR CONTAINER */}
+             <div className="flex-grow mx-2" style={{ maxWidth: 'calc(100% - 80px)' }} onKeyDown={handleKeyDown}>
+                {!isInputDisabled ? (
+                    <ReactQuill
+                        ref={quillRef}
+                        theme="snow"
+                        value={editorHtml}
+                        onChange={setEditorHtml}
+                        modules={modules}
+                        placeholder={attachedFile ? "Adicione uma legenda (opcional)" : "Digite uma mensagem"}
+                        className="custom-quill-editor"
+                    />
+                ) : (
+                    <div className="p-3 text-gray-400 italic bg-gray-50 rounded">
+                        {conversation.status !== 'open' ? "Conversa encerrada" : "Assuma a conversa para enviar mensagens"}
+                    </div>
+                )}
+             </div>
+
+             <button onClick={handleSend} className="p-2 ml-1 text-blue-500 hover:text-blue-600 transition-colors duration-200 disabled:text-gray-300 self-end mb-2" disabled={isInputDisabled}><SendIcon /></button>
+          </div>
+
+          <style>{`
+            .custom-quill-editor .ql-container {
+                border: none !important;
+                font-family: inherit;
+                font-size: 0.875rem;
+            }
+            .custom-quill-editor .ql-toolbar {
+                border: none !important;
+                border-bottom: 1px solid #f3f4f6 !important;
+                padding: 4px 0px;
+            }
+            .custom-quill-editor .ql-editor {
+                min-height: 44px;
+                max-height: 160px;
+                overflow-y: auto;
+                padding: 8px 0px;
+            }
+            .custom-quill-editor .ql-editor.ql-blank::before {
+                color: #9ca3af;
+                font-style: normal;
+                left: 0;
+            }
+          `}</style>
         </div>
       </footer>
     </div>
