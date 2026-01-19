@@ -1,9 +1,10 @@
+// src/components/ConversationList.jsx
+
 import React, { useState } from 'react';
 import UserIcon from './UserIcon';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
-// --- ICONS (Added SearchIcon) ---
 const SearchIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5 text-gray-400"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
 );
@@ -47,25 +48,27 @@ const formatDisplayDate = (timestamp) => {
 export default function ConversationList({ conversations, onSelect, selectedId, onLogout, anyNeedsAttention, isAdmin, onShowUserManagement, currentUser }) {
   const [searchQuery, setSearchQuery] = useState('');
 
-  const sortedConversations = [...conversations].sort((a, b) => new Date(b.last_updated) - new Date(a.last_updated));
+  const sortedConversations = [...conversations].sort((a, b) => {
+    const aNeedsAttention = a.status === 'open' && a.human_supervision;
+    const bNeedsAttention = b.status === 'open' && b.human_supervision;
+
+    if (aNeedsAttention && !bNeedsAttention) return -1; // a comes first
+    if (!aNeedsAttention && bNeedsAttention) return 1;  // b comes first
+
+    return new Date(b.last_updated) - new Date(a.last_updated);
+  });
 
   const filteredConversations = sortedConversations.filter(conv => {
     const query = searchQuery.toLowerCase();
-    // If there's no query, show all conversations (that are open or recently closed)
     if (!query) {
         return conv.status.startsWith('open') || conv.status.startsWith('closed');
     }
-
-    // Check if the phone number matches
     if (conv.phone_number.includes(query)) {
         return true;
     }
-
-    // Check if any message text includes the query
     if (conv.messages && Array.isArray(conv.messages)) {
         return conv.messages.some(msg => msg.text && msg.text.toLowerCase().includes(query));
     }
-
     return false;
   });
 
@@ -96,7 +99,7 @@ export default function ConversationList({ conversations, onSelect, selectedId, 
             </div>
             <input
                 type="text"
-                placeholder="Pesquisar ou começar uma nova conversa"
+                placeholder="Pesquisar..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full bg-gray-100 border border-gray-200 rounded-full py-2 pl-10 pr-4 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
@@ -111,41 +114,56 @@ export default function ConversationList({ conversations, onSelect, selectedId, 
           const isClosed = conv.status !== 'open';
           const textStyle = isClosed ? 'italic text-gray-400' : needsAttention ? 'text-red-600 font-bold' : 'text-gray-500';
 
+          let bgClass = 'hover:bg-gray-50';
+          if (selectedId === conv.composite_id) {
+            bgClass = 'bg-blue-100'; // Darker blue for selection
+          } else if (needsAttention) {
+            bgClass = 'bg-red-50 hover:bg-red-100'; // Light red for attention needed
+          }
+
           return (
             <div
               key={conv.composite_id}
               onClick={() => onSelect(conv)}
-              className={`flex items-center p-3 cursor-pointer transition-colors duration-200 relative ${selectedId === conv.composite_id ? 'bg-blue-50' : 'hover:bg-gray-50'}`}
+              className={`flex items-center p-3 cursor-pointer transition-colors duration-200 relative border-b border-gray-100 ${bgClass}`}
             >
               <div className="w-12 h-12 rounded-full mr-4 flex items-center justify-center bg-gray-200 flex-shrink-0">
                   <UserIcon className="h-8 w-8 text-gray-500" />
+                  {/* Optional: Add a small red dot on the avatar if needs attention */}
+                  {needsAttention && (
+                      <span className="absolute top-2 left-10 w-3 h-3 bg-red-500 border-2 border-white rounded-full"></span>
+                  )}
               </div>
               <div className="flex-grow overflow-hidden">
                 <div className="flex justify-between items-center">
                   <div className="flex items-center">
                     <div className="flex flex-col">
-                        <h2 className="font-semibold text-gray-700 truncate">
+                        <h2 className={`font-semibold truncate ${needsAttention ? 'text-red-800' : 'text-gray-700'}`}>
                             {conv.user_name || conv.phone_number}
-                        </h2> {conv.user_name && (
+                        </h2>
+                        {conv.user_name && (
                             <span className="text-xs text-gray-500">{conv.phone_number}</span>
                         )}
                     </div>
-                    <span className="ml-2 text-xs text-gray-500 bg-gray-200 px-2 py-0.5 rounded-full">{conv.thread_id.replace('_', ' ')}</span>
+                    {/* Simplified thread ID badge */}
+                    {/* <span className="ml-2 text-xs text-gray-500 bg-gray-200 px-2 py-0.5 rounded-full">{conv.thread_id.replace('_', ' ')}</span> */}
                   </div>
-                  <span className="text-xs text-gray-400 flex-shrink-0 ml-2">{formatDisplayDate(conv.last_updated)}</span>
+                  <span className={`text-xs flex-shrink-0 ml-2 ${needsAttention ? 'text-red-600 font-bold' : 'text-gray-400'}`}>
+                    {formatDisplayDate(conv.last_updated)}
+                  </span>
                 </div>
 
-                {/* --- RENDER LAST MESSAGE AS MARKDOWN --- */}
-                <div className={`text-sm truncate ${textStyle}`}>
+                {/* --- RENDER LAST MESSAGE --- */}
+                <div className={`text-sm truncate mt-1 ${textStyle}`}>
                     {isClosed ? (
                         `Tópico encerrado (${conv.status.split('_').pop()})`
                     ) : (
                         <ReactMarkdown
                             remarkPlugins={[remarkGfm]}
-                            allowedElements={['strong', 'em', 'del', 'span', 'a']} // Prevent <p> tags so it stays inline
-                            unwrapDisallowed={true} // Unwrap content from disallowed elements
+                            disallowedElements={['p']}
+                            unwrapDisallowed={true}
                             components={{
-                                a: ({node, ...props}) => <span {...props} />, // Disable links in preview
+                                a: ({node, ...props}) => <span {...props} />,
                             }}
                         >
                             {conv.last_message || ''}
