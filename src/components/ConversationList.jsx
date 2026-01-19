@@ -160,7 +160,7 @@ export default function ConversationList({ conversations, onSelect, selectedId, 
                     ) : (
                         <ReactMarkdown
                             remarkPlugins={[remarkGfm]}
-                            disallowedElements={['p']}
+                            allowedElements={['strong', 'em', 'del', 'span', 'a']}
                             unwrapDisallowed={true}
                             components={{
                                 a: ({node, ...props}) => <span {...props} />,
