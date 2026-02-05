@@ -150,7 +150,7 @@ export default function UserManagement({ token, apiBaseUrl, onAction, currentUse
               {message}
             </p>
           )}
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto max-h-[60vh] overflow-y-auto">
               <table className="w-full text-sm text-left text-gray-500">
                   <thead className="text-xs text-gray-700 uppercase bg-gray-50">
                       <tr>
