@@ -89,7 +89,7 @@ export default function UserManagement({ token, apiBaseUrl, onAction, currentUse
       `Are you sure you want to update user "${username}"?`,
       async () => {
         try {
-          const response = await fetch(`${apiBaseUrl}/users/${username}`, {
+          const response = await fetch(`${apiBaseUrl}/users/${encodeURIComponent(username)}`, {
             method: 'PUT',
             headers: {
               'Content-Type': 'application/json',
@@ -117,7 +117,7 @@ export default function UserManagement({ token, apiBaseUrl, onAction, currentUse
         `Are you sure you want to delete the user "${username}"? This action cannot be undone.`,
         async () => {
             try {
-                const response = await fetch(`${apiBaseUrl}/users/${username}`, {
+                const response = await fetch(`${apiBaseUrl}/users/${encodeURIComponent(username)}`, {
                     method: 'DELETE',
                     headers: {
                         'Authorization': `Bearer ${token}`,
@@ -150,7 +150,7 @@ export default function UserManagement({ token, apiBaseUrl, onAction, currentUse
               {message}
             </p>
           )}
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto max-h-[60vh] overflow-y-auto">
               <table className="w-full text-sm text-left text-gray-500">
                   <thead className="text-xs text-gray-700 uppercase bg-gray-50">
                       <tr>
