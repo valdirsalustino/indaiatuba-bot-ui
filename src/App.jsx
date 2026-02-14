@@ -112,18 +112,88 @@ function App() {
     }
   }, [token, fetchConversations]);
 
-  useEffect(() => {
+ useEffect(() => {
     if (!token) return;
     const ws = new WebSocket(WEBSOCKET_URL);
+
     ws.onopen = () => console.log('WebSocket connected');
+
     ws.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      if (['new_handoff_request', 'new_message', 'supervision_type_changed', 'conversation_resolved', 'conversation_taken_over'].includes(data.update)) {
-        fetchConversations();
+      try {
+        const data = JSON.parse(event.data);
+
+        if (data.update === 'new_message' && data.data) {
+          setConversations(prevConversations => {
+            const targetIndex = prevConversations.findIndex(
+                c => c.composite_id === data.composite_id
+            );
+
+            if (targetIndex === -1) return prevConversations;
+
+            const targetConv = prevConversations[targetIndex];
+            const currentMessages = targetConv.messages || [];
+
+            const isDuplicate = currentMessages.some(msg =>
+                msg.text === data.data.text &&
+                msg.timestamp === data.data.timestamp
+            );
+            if (isDuplicate) return prevConversations;
+
+            let contentType = 'text'; // Default
+            if (data.data.media_url) {
+                const url = data.data.media_url.toLowerCase();
+                const cleanUrl = url.split('?')[0];
+
+                if (/\.(jpg|jpeg|png|gif|webp)$/.test(cleanUrl)) {
+                    contentType = 'image';
+                } else if (/\.(mp4|mov|avi|webm)$/.test(cleanUrl)) {
+                    contentType = 'video';
+                } else if (/\.(mp3|wav|ogg)$/.test(cleanUrl)) {
+                    contentType = 'audio';
+                } else {
+                    contentType = 'document';
+                }
+            }
+
+            const newMessage = {
+                text: data.data.text,
+                sender: data.data.sender,
+                timestamp: data.data.timestamp,
+                media_url: data.data.media_url,
+                content_type: contentType
+            };
+
+            const updatedConv = {
+                ...targetConv,
+                messages: [...currentMessages, newMessage],
+                last_message: newMessage.text,
+                last_updated: newMessage.timestamp
+            };
+
+            const otherConvs = [
+                ...prevConversations.slice(0, targetIndex),
+                ...prevConversations.slice(targetIndex + 1)
+            ];
+
+            return [updatedConv, ...otherConvs];
+          });
+        }
+
+        else if (['new_handoff_request', 'conversation_resolved'].includes(data.update)) {
+          fetchConversations();
+        }
+      } catch (e) {
+        console.error("Error parsing websocket message", e);
       }
     };
+
     ws.onclose = () => console.log('WebSocket disconnected');
-    return () => ws.close();
+
+    return () => {
+        if (ws.readyState === 1) {
+            ws.close();
+        }
+    };
   }, [token, fetchConversations]);
 
   useEffect(() => {
