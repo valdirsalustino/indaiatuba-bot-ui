@@ -141,18 +141,23 @@ function App() {
 
             let contentType = 'text'; // Default
             if (data.data.media_url) {
-                const url = data.data.media_url.toLowerCase();
-                const cleanUrl = url.split('?')[0];
+              const url = data.data.media_url.toLowerCase();
 
-                if (/\.(jpg|jpeg|png|gif|webp)$/.test(cleanUrl)) {
-                    contentType = 'image';
-                } else if (/\.(mp4|mov|avi|webm)$/.test(cleanUrl)) {
-                    contentType = 'video';
-                } else if (/\.(mp3|wav|ogg)$/.test(cleanUrl)) {
-                    contentType = 'audio';
-                } else {
-                    contentType = 'document';
-                }
+              const cleanUrl = decodeURIComponent(url.split('?')[0]);
+
+              const imageRegex = /\.(jpg|jpeg|png|gif|webp)($|[;\s%])/;
+              const videoRegex = /\.(mp4|mov|avi|webm)($|[;\s%])/;
+              const audioRegex = /\.(mp3|wav|ogg|opus)($|[;\s%])/; // Added 'opus' just in case
+
+              if (imageRegex.test(cleanUrl)) {
+                  contentType = 'image';
+              } else if (videoRegex.test(cleanUrl)) {
+                  contentType = 'video';
+              } else if (audioRegex.test(cleanUrl)) {
+                  contentType = 'audio';
+              } else {
+                  contentType = 'document';
+              }
             }
 
             const newMessage = {
