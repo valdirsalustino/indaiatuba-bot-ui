@@ -1,6 +1,6 @@
 // src/App.jsx
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { jwtDecode } from 'jwt-decode';
 import Login from './components/Login.jsx';
 import ConversationList from './components/ConversationList.jsx';
@@ -42,6 +42,7 @@ function App() {
   const [anyNeedsAttention, setAnyNeedsAttention] = useState(false);
   const [activeView, setActiveView] = useState('conversations');
 
+  const conversationsRef = useRef(conversations);
   const [modalState, setModalState] = useState({
     isOpen: false,
     message: '',
@@ -85,19 +86,63 @@ function App() {
     try {
       const response = await authFetch(`${API_BASE_URL}/conversations`);
       if (!response.ok) throw new Error('Failed to fetch conversations.');
-      const data = await response.json();
-      setConversations(data);
-      const needsAttention = data.some(conv => conv.status === 'open' && conv.human_supervision === true);
+
+      const serverData = await response.json();
+      setConversations(prevConversations => {
+        const localMap = new Map(prevConversations.map(c => [c.composite_id, c]));
+        return serverData.map(serverConv => {
+          const localConv = localMap.get(serverConv.composite_id);
+
+          if (!localConv) return serverConv;
+
+          const serverMsgs = serverConv.messages || [];
+          const localMsgs = localConv.messages || [];
+
+          const serverMsgSignatures = new Set(
+            serverMsgs.map(m => `${m.timestamp}-${m.text}`)
+          );
+
+          const mergedMessages = [...serverMsgs];
+
+          localMsgs.forEach(localMsg => {
+            const key = `${localMsg.timestamp}-${localMsg.text}`;
+            if (!serverMsgSignatures.has(key)) {
+              mergedMessages.push(localMsg);
+            }
+          });
+
+          mergedMessages.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+
+          const lastMsg = mergedMessages.length > 0
+            ? mergedMessages[mergedMessages.length - 1]
+            : null;
+
+          return {
+            ...serverConv,
+            messages: mergedMessages,
+            last_message: lastMsg ? lastMsg.text : serverConv.last_message,
+            last_updated: lastMsg ? lastMsg.timestamp : serverConv.last_updated
+          };
+        });
+      });
+
+      const needsAttention = serverData.some(
+        conv => conv.status === 'open' && conv.human_supervision === true
+      );
       setAnyNeedsAttention(needsAttention);
+
     } catch (err) {
-      if (err.message !== 'Authentication failed') {
-          setError(err.message);
+    if (err.message !== 'Authentication failed') {
+        setError(err.message);
       }
     } finally {
       setIsLoading(false);
     }
   }, [token, authFetch]);
 
+  useEffect(() => {
+    conversationsRef.current = conversations;
+  }, [conversations]);
 
   useEffect(() => {
     const initialToken = localStorage.getItem('admin_token');
@@ -123,6 +168,16 @@ function App() {
         const data = JSON.parse(event.data);
 
         if (data.update === 'new_message' && data.data) {
+          const isKnownConversation = conversationsRef.current.some(
+            c => c.composite_id === data.composite_id
+          );
+
+          // If it's a new thread, fetch the updated list to get full metadata
+          if (!isKnownConversation) {
+            console.log("New thread detected, fetching conversations...");
+            fetchConversations();
+            return;
+          }
           setConversations(prevConversations => {
             const targetIndex = prevConversations.findIndex(
                 c => c.composite_id === data.composite_id
