@@ -44,6 +44,14 @@ const formatDisplayDate = (timestamp) => {
   return messageDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
 };
 
+const formatLastMessageText = (text) => {
+    if (!text) return '';
+    return text
+        .replace(/Media received:\s*image/i, '📷 [Imagem]')
+        .replace(/Media received:\s*video/i, '🎥 [Vídeo]')
+        .replace(/Media received:\s*document/i, '📄 [Documento]')
+        .replace(/Media received:\s*audio/i, '🎵 [Áudio]');
+};
 
 export default function ConversationList({ conversations, onSelect, selectedId, onLogout, anyNeedsAttention, isAdmin, onShowUserManagement, currentUser }) {
   const [searchQuery, setSearchQuery] = useState('');
@@ -166,7 +174,7 @@ export default function ConversationList({ conversations, onSelect, selectedId, 
                                 a: ({node, ...props}) => <span {...props} />,
                             }}
                         >
-                            {conv.last_message || ''}
+                            { formatLastMessageText(conv.last_message || '')}
                         </ReactMarkdown>
                     )}
                 </div>

@@ -236,6 +236,11 @@ export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved
                 ? msg.text.replace(/^\*\*[^*]+:\*\*\s+/, '').replace(/\u00A0/g, ' ').replace(/^-\s+/gm, '• ')
                 : '';
 
+            // Remove automatic texts that came from websocket
+            if (/^Media received:\s*(image|video|document|audio)$/i.test(displayText.trim())) {
+                displayText = '';
+            }
+
             return (
               <React.Fragment key={index}>
                 {dateDivider}
