@@ -239,7 +239,7 @@ function App() {
           });
         }
 
-        else if (['new_handoff_request', 'conversation_resolved'].includes(data.update)) {
+        else if (['new_handoff_request', 'conversation_resolved', 'supervision_type_changed', 'conversation_taken_over'].includes(data.update)) {
           fetchConversations();
         }
       } catch (e) {
