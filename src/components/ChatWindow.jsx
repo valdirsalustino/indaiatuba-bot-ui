@@ -237,8 +237,10 @@ export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved
                 : '';
 
             // Remove automatic texts that came from websocket
-            if (/^Media received:\s*(image|video|document|audio)$/i.test(displayText.trim())) {
-                displayText = '';
+            if (/Media received:\s*(image|video|document|audio)\.?/i.test(displayText)) {
+                displayText = displayText
+                    .replace(/Media received:\s*(image|video|document|audio)\.?/ig, '')
+                    .trim();
             }
 
             return (
