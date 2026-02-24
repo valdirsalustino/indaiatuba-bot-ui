@@ -79,12 +79,12 @@ function App() {
   }, [handleLogout]);
 
 
-  const fetchConversations = useCallback(async () => {
+  const fetchConversations = useCallback(async (skip = 0, limit = 100) => {
     if (!token) return;
     setIsLoading(true);
     setError(null);
     try {
-      const response = await authFetch(`${API_BASE_URL}/conversations`);
+      const response = await authFetch(`${API_BASE_URL}/conversations?days=30&limit=${limit}&skip=${skip}`);
       if (!response.ok) throw new Error('Failed to fetch conversations.');
 
       const serverData = await response.json();
