@@ -232,9 +232,17 @@ export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved
 
             // CLEAN DISPLAY TEXT: Remove bold signature and replace non-breaking spaces
             // NOTE: We also convert standard hyphens to bullets here purely for display consistency in the Admin UI
-            const displayText = msg.text
-                ? msg.text.replace(/^\*\*[^*]+:\*\*\s+/, '').replace(/\u00A0/g, ' ').replace(/^-\s+/gm, '• ')
-                : '';
+            let rawText = msg.text || msg.body || msg.caption || msg.message || '';
+            if (typeof rawText !== 'string') {
+              rawText = String(rawText);
+            }
+
+            let displayText = rawText
+              .replace(/Media received:.*$/ig, '')
+              .replace(/^\*\*[^*]+:\*\*\s+/, '') // Keeps your old bold signature cleaner
+              .replace(/\u00A0/g, ' ')
+              .replace(/^-\s+/gm, '• ')
+              .trim();
 
             return (
               <React.Fragment key={index}>
