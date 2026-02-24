@@ -232,9 +232,18 @@ function App() {
               );
               if (isDuplicate) return prevConversations;
 
-              let contentType = data.data.content_type || 'text';
-              // Only run the regex guess if the backend DID NOT provide a content_type
-              if (!data.data.content_type && data.data.media_url) {
+              let rawContentType = data.data.content_type;
+              let contentType = 'text';
+
+              if (rawContentType) {
+                  if (rawContentType.startsWith('image/')) contentType = 'image';
+                  else if (rawContentType.startsWith('video/')) contentType = 'video';
+                  else if (rawContentType.startsWith('audio/')) contentType = 'audio';
+                  else if (rawContentType.startsWith('application/')) contentType = 'document';
+                  else contentType = rawContentType; // Fallback
+              }
+              // ONLY guess by URL if the backend didn't provide a content_type
+              else if (data.data.media_url) {
                 const url = data.data.media_url.toLowerCase();
                 const cleanUrl = decodeURIComponent(url.split('?')[0]);
 
