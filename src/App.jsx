@@ -1,6 +1,6 @@
 // src/App.jsx
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { jwtDecode } from 'jwt-decode';
 import Login from './components/Login.jsx';
 import ConversationList from './components/ConversationList.jsx';
@@ -42,6 +42,7 @@ function App() {
   const [anyNeedsAttention, setAnyNeedsAttention] = useState(false);
   const [activeView, setActiveView] = useState('conversations');
 
+  const conversationsRef = useRef(conversations);
   const [modalState, setModalState] = useState({
     isOpen: false,
     message: '',
@@ -85,19 +86,63 @@ function App() {
     try {
       const response = await authFetch(`${API_BASE_URL}/conversations`);
       if (!response.ok) throw new Error('Failed to fetch conversations.');
-      const data = await response.json();
-      setConversations(data);
-      const needsAttention = data.some(conv => conv.status === 'open' && conv.human_supervision === true);
+
+      const serverData = await response.json();
+      setConversations(prevConversations => {
+        const localMap = new Map(prevConversations.map(c => [c.composite_id, c]));
+        return serverData.map(serverConv => {
+          const localConv = localMap.get(serverConv.composite_id);
+
+          if (!localConv) return serverConv;
+
+          const serverMsgs = serverConv.messages || [];
+          const localMsgs = localConv.messages || [];
+
+          const serverMsgSignatures = new Set(
+            serverMsgs.map(m => `${m.timestamp}-${m.text}`)
+          );
+
+          const mergedMessages = [...serverMsgs];
+
+          localMsgs.forEach(localMsg => {
+            const key = `${localMsg.timestamp}-${localMsg.text}`;
+            if (!serverMsgSignatures.has(key)) {
+              mergedMessages.push(localMsg);
+            }
+          });
+
+          mergedMessages.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+
+          const lastMsg = mergedMessages.length > 0
+            ? mergedMessages[mergedMessages.length - 1]
+            : null;
+
+          return {
+            ...serverConv,
+            messages: mergedMessages,
+            last_message: lastMsg ? lastMsg.text : serverConv.last_message,
+            last_updated: lastMsg ? lastMsg.timestamp : serverConv.last_updated
+          };
+        });
+      });
+
+      const needsAttention = serverData.some(
+        conv => conv.status === 'open' && conv.human_supervision === true
+      );
       setAnyNeedsAttention(needsAttention);
+
     } catch (err) {
-      if (err.message !== 'Authentication failed') {
-          setError(err.message);
+    if (err.message !== 'Authentication failed') {
+        setError(err.message);
       }
     } finally {
       setIsLoading(false);
     }
   }, [token, authFetch]);
 
+  useEffect(() => {
+    conversationsRef.current = conversations;
+  }, [conversations]);
 
   useEffect(() => {
     const initialToken = localStorage.getItem('admin_token');
@@ -112,18 +157,103 @@ function App() {
     }
   }, [token, fetchConversations]);
 
-  useEffect(() => {
+ useEffect(() => {
     if (!token) return;
     const ws = new WebSocket(WEBSOCKET_URL);
+
     ws.onopen = () => console.log('WebSocket connected');
+
     ws.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      if (['new_handoff_request', 'new_message', 'supervision_type_changed', 'conversation_resolved', 'conversation_taken_over'].includes(data.update)) {
-        fetchConversations();
+      try {
+        const data = JSON.parse(event.data);
+
+        if (data.update === 'new_message' && data.data) {
+          const isKnownConversation = conversationsRef.current.some(
+            c => c.composite_id === data.composite_id
+          );
+
+          // If it's a new thread, fetch the updated list to get full metadata
+          if (!isKnownConversation) {
+            console.log("New thread detected, fetching conversations...");
+            fetchConversations();
+            return;
+          }
+          setConversations(prevConversations => {
+            const targetIndex = prevConversations.findIndex(
+                c => c.composite_id === data.composite_id
+            );
+
+            if (targetIndex === -1) return prevConversations;
+
+            const targetConv = prevConversations[targetIndex];
+            const currentMessages = targetConv.messages || [];
+
+            const isDuplicate = currentMessages.some(msg =>
+                msg.text === data.data.text &&
+                msg.timestamp === data.data.timestamp
+            );
+            if (isDuplicate) return prevConversations;
+
+            let contentType = 'text'; // Default
+            if (data.data.media_url) {
+              const url = data.data.media_url.toLowerCase();
+
+              const cleanUrl = decodeURIComponent(url.split('?')[0]);
+
+              const imageRegex = /\.(jpg|jpeg|png|gif|webp)($|[;\s%])/;
+              const videoRegex = /\.(mp4|mov|avi|webm)($|[;\s%])/;
+              const audioRegex = /\.(mp3|wav|ogg|opus)($|[;\s%])/; // Added 'opus' just in case
+
+              if (imageRegex.test(cleanUrl)) {
+                  contentType = 'image';
+              } else if (videoRegex.test(cleanUrl)) {
+                  contentType = 'video';
+              } else if (audioRegex.test(cleanUrl)) {
+                  contentType = 'audio';
+              } else {
+                  contentType = 'document';
+              }
+            }
+
+            const newMessage = {
+                text: data.data.text,
+                sender: data.data.sender,
+                timestamp: data.data.timestamp,
+                media_url: data.data.media_url,
+                content_type: contentType
+            };
+
+            const updatedConv = {
+                ...targetConv,
+                messages: [...currentMessages, newMessage],
+                last_message: newMessage.text,
+                last_updated: newMessage.timestamp
+            };
+
+            const otherConvs = [
+                ...prevConversations.slice(0, targetIndex),
+                ...prevConversations.slice(targetIndex + 1)
+            ];
+
+            return [updatedConv, ...otherConvs];
+          });
+        }
+
+        else if (['new_handoff_request', 'conversation_resolved', 'supervision_type_changed', 'conversation_taken_over'].includes(data.update)) {
+          fetchConversations();
+        }
+      } catch (e) {
+        console.error("Error parsing websocket message", e);
       }
     };
+
     ws.onclose = () => console.log('WebSocket disconnected');
-    return () => ws.close();
+
+    return () => {
+        if (ws.readyState === 1) {
+            ws.close();
+        }
+    };
   }, [token, fetchConversations]);
 
   useEffect(() => {
