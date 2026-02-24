@@ -232,8 +232,9 @@ function App() {
               );
               if (isDuplicate) return prevConversations;
 
-              let contentType = 'text';
-              if (data.data.media_url) {
+              let contentType = data.data.content_type || 'text';
+              // Only run the regex guess if the backend DID NOT provide a content_type
+              if (!data.data.content_type && data.data.media_url) {
                 const url = data.data.media_url.toLowerCase();
                 const cleanUrl = decodeURIComponent(url.split('?')[0]);
 
@@ -330,7 +331,9 @@ function App() {
 
     const formData = new FormData();
     if (messageData.file) formData.append('file', messageData.file);
-    if (messageData.text) formData.append('text', messageData.text);
+    if (messageData.text !== undefined && messageData.text !== null) {
+      formData.append('text', messageData.text);
+    }
 
     try {
         await authFetch(`${API_BASE_URL}/conversations/${selectedConversation.composite_id}/send`, {
