@@ -53,8 +53,20 @@ const normalizeLastMessage = (message) => {
   return message;
 };
 
-export default function ConversationList({ conversations, onSelect, selectedId, onLogout, anyNeedsAttention, isAdmin, onShowUserManagement, currentUser }) {
+// Added onLoadMore to the props
+export default function ConversationList({ conversations, onSelect, selectedId, onLogout, anyNeedsAttention, isAdmin, onShowUserManagement, currentUser, onLoadMore }) {
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Detect scroll reaching the bottom
+  const handleScroll = (e) => {
+    const { scrollTop, clientHeight, scrollHeight } = e.currentTarget;
+    // If the user scrolls within 10 pixels of the bottom, trigger load more
+    if (scrollHeight - scrollTop <= clientHeight + 10) {
+        if (onLoadMore) {
+            onLoadMore();
+        }
+    }
+  };
 
   const sortedConversations = [...conversations].sort((a, b) => {
     const aNeedsAttention = a.status === 'open' && a.human_supervision;
@@ -115,8 +127,8 @@ export default function ConversationList({ conversations, onSelect, selectedId, 
         </div>
       </div>
 
-
-      <div className="flex-grow overflow-y-auto">
+      {/* Added the onScroll handler to this specific div */}
+      <div className="flex-grow overflow-y-auto" onScroll={handleScroll}>
         {filteredConversations.map(conv => {
           const needsAttention = conv.status === 'open' && conv.human_supervision;
           const isClosed = conv.status !== 'open';
@@ -153,8 +165,6 @@ export default function ConversationList({ conversations, onSelect, selectedId, 
                             <span className="text-xs text-gray-500">{conv.phone_number}</span>
                         )}
                     </div>
-                    {/* Simplified thread ID badge */}
-                    {/* <span className="ml-2 text-xs text-gray-500 bg-gray-200 px-2 py-0.5 rounded-full">{conv.thread_id.replace('_', ' ')}</span> */}
                   </div>
                   <span className={`text-xs flex-shrink-0 ml-2 ${needsAttention ? 'text-red-600 font-bold' : 'text-gray-400'}`}>
                     {formatDisplayDate(conv.last_updated)}

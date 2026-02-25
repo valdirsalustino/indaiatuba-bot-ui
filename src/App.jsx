@@ -42,6 +42,11 @@ function App() {
   const [anyNeedsAttention, setAnyNeedsAttention] = useState(false);
   const [activeView, setActiveView] = useState('conversations');
 
+  // Pagination States
+  const [skip, setSkip] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const LIMIT = 50;
+
   const conversationsRef = useRef(conversations);
   const [modalState, setModalState] = useState({
     isOpen: false,
@@ -78,19 +83,28 @@ function App() {
       return response;
   }, [handleLogout]);
 
-
-  const fetchConversations = useCallback(async () => {
+  // Updated fetchConversations to handle pagination
+  const fetchConversations = useCallback(async (currentSkip = 0, isLoadMore = false) => {
     if (!token) return;
     setIsLoading(true);
     setError(null);
     try {
-      const response = await authFetch(`${API_BASE_URL}/conversations`);
+      const response = await authFetch(`${API_BASE_URL}/conversations?days=30&limit=${LIMIT}&skip=${currentSkip}`);
       if (!response.ok) throw new Error('Failed to fetch conversations.');
 
       const serverData = await response.json();
+
+      // If the server returns fewer items than the limit, there are no more pages
+      if (serverData.length < LIMIT) {
+        setHasMore(false);
+      }
+
       setConversations(prevConversations => {
-        const localMap = new Map(prevConversations.map(c => [c.composite_id, c]));
-        return serverData.map(serverConv => {
+        // If it's a new page being loaded, append it. Otherwise, initialize it.
+        const baseConversations = isLoadMore ? prevConversations : [];
+        const localMap = new Map(baseConversations.map(c => [c.composite_id, c]));
+
+        const newConversations = serverData.map(serverConv => {
           const localConv = localMap.get(serverConv.composite_id);
 
           if (!localConv) return serverConv;
@@ -124,21 +138,37 @@ function App() {
             last_updated: lastMsg ? lastMsg.timestamp : serverConv.last_updated
           };
         });
+
+        if (isLoadMore) {
+           // Filter out duplicates in case a conversation moved up the list while paginating
+           const existingIds = new Set(baseConversations.map(c => c.composite_id));
+           const trulyNew = newConversations.filter(c => !existingIds.has(c.composite_id));
+           return [...baseConversations, ...trulyNew];
+        }
+        return newConversations;
       });
 
-      const needsAttention = serverData.some(
+      setAnyNeedsAttention(prev => prev || serverData.some(
         conv => conv.status === 'open' && conv.human_supervision === true
-      );
-      setAnyNeedsAttention(needsAttention);
+      ));
 
     } catch (err) {
-    if (err.message !== 'Authentication failed') {
+      if (err.message !== 'Authentication failed') {
         setError(err.message);
       }
     } finally {
       setIsLoading(false);
     }
   }, [token, authFetch]);
+
+  // Expose a loadMore function to pass to the ConversationList
+  const loadMoreConversations = () => {
+    if (!isLoading && hasMore) {
+        const nextSkip = skip + LIMIT;
+        setSkip(nextSkip);
+        fetchConversations(nextSkip, true);
+    }
+  };
 
   useEffect(() => {
     conversationsRef.current = conversations;
@@ -151,106 +181,119 @@ function App() {
     }
   }, [handleLogout]);
 
+  // Initial Fetch on load
   useEffect(() => {
     if (token) {
-        fetchConversations();
+        setSkip(0);
+        setHasMore(true);
+        fetchConversations(0, false);
     }
   }, [token, fetchConversations]);
 
- useEffect(() => {
+  // WebSocket Connection with Auto-Reconnect
+  useEffect(() => {
     if (!token) return;
-    const ws = new WebSocket(WEBSOCKET_URL);
 
-    ws.onopen = () => console.log('WebSocket connected');
+    let ws;
+    let reconnectTimeout;
 
-    ws.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
+    const connectWebSocket = () => {
+      ws = new WebSocket(WEBSOCKET_URL);
 
-        if (data.update === 'new_message' && data.data) {
-          const isKnownConversation = conversationsRef.current.some(
-            c => c.composite_id === data.composite_id
-          );
+      ws.onopen = () => console.log('WebSocket connected');
 
-          // If it's a new thread, fetch the updated list to get full metadata
-          if (!isKnownConversation) {
-            console.log("New thread detected, fetching conversations...");
-            fetchConversations();
-            return;
-          }
-          setConversations(prevConversations => {
-            const targetIndex = prevConversations.findIndex(
-                c => c.composite_id === data.composite_id
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+
+          if (data.update === 'new_message' && data.data) {
+            const isKnownConversation = conversationsRef.current.some(
+              c => c.composite_id === data.composite_id
             );
 
-            if (targetIndex === -1) return prevConversations;
-
-            const targetConv = prevConversations[targetIndex];
-            const currentMessages = targetConv.messages || [];
-
-            const isDuplicate = currentMessages.some(msg =>
-                msg.text === data.data.text &&
-                msg.timestamp === data.data.timestamp
-            );
-            if (isDuplicate) return prevConversations;
-
-            let contentType = 'text'; // Default
-            if (data.data.media_url) {
-              const url = data.data.media_url.toLowerCase();
-
-              const cleanUrl = decodeURIComponent(url.split('?')[0]);
-
-              const imageRegex = /\.(jpg|jpeg|png|gif|webp)($|[;\s%])/;
-              const videoRegex = /\.(mp4|mov|avi|webm)($|[;\s%])/;
-              const audioRegex = /\.(mp3|wav|ogg|opus)($|[;\s%])/; // Added 'opus' just in case
-
-              if (imageRegex.test(cleanUrl)) {
-                  contentType = 'image';
-              } else if (videoRegex.test(cleanUrl)) {
-                  contentType = 'video';
-              } else if (audioRegex.test(cleanUrl)) {
-                  contentType = 'audio';
-              } else {
-                  contentType = 'document';
-              }
+            if (!isKnownConversation) {
+              fetchConversations(0, false); // Refresh from top if a brand new thread comes in
+              return;
             }
 
-            const newMessage = {
-                text: data.data.text,
-                sender: data.data.sender,
-                timestamp: data.data.timestamp,
-                media_url: data.data.media_url,
-                content_type: contentType
-            };
+            setConversations(prevConversations => {
+              const targetIndex = prevConversations.findIndex(
+                  c => c.composite_id === data.composite_id
+              );
 
-            const updatedConv = {
-                ...targetConv,
-                messages: [...currentMessages, newMessage],
-                last_message: newMessage.text,
-                last_updated: newMessage.timestamp
-            };
+              if (targetIndex === -1) return prevConversations;
 
-            const otherConvs = [
-                ...prevConversations.slice(0, targetIndex),
-                ...prevConversations.slice(targetIndex + 1)
-            ];
+              const targetConv = prevConversations[targetIndex];
+              const currentMessages = targetConv.messages || [];
 
-            return [updatedConv, ...otherConvs];
-          });
+              const isDuplicate = currentMessages.some(msg =>
+                  msg.text === data.data.text &&
+                  msg.timestamp === data.data.timestamp
+              );
+              if (isDuplicate) return prevConversations;
+
+              let contentType = 'text';
+              if (data.data.media_url) {
+                const url = data.data.media_url.toLowerCase();
+                const cleanUrl = decodeURIComponent(url.split('?')[0]);
+
+                const imageRegex = /\.(jpg|jpeg|png|gif|webp)($|[;\s%])/;
+                const videoRegex = /\.(mp4|mov|avi|webm)($|[;\s%])/;
+                const audioRegex = /\.(mp3|wav|ogg|opus)($|[;\s%])/;
+
+                if (imageRegex.test(cleanUrl)) contentType = 'image';
+                else if (videoRegex.test(cleanUrl)) contentType = 'video';
+                else if (audioRegex.test(cleanUrl)) contentType = 'audio';
+                else contentType = 'document';
+              }
+
+              const newMessage = {
+                  text: data.data.text,
+                  sender: data.data.sender,
+                  timestamp: data.data.timestamp,
+                  media_url: data.data.media_url,
+                  content_type: contentType
+              };
+
+              const updatedConv = {
+                  ...targetConv,
+                  messages: [...currentMessages, newMessage],
+                  last_message: newMessage.text,
+                  last_updated: newMessage.timestamp
+              };
+
+              const otherConvs = [
+                  ...prevConversations.slice(0, targetIndex),
+                  ...prevConversations.slice(targetIndex + 1)
+              ];
+
+              return [updatedConv, ...otherConvs];
+            });
+          }
+          else if (['new_handoff_request', 'conversation_resolved', 'supervision_type_changed', 'conversation_taken_over'].includes(data.update)) {
+            fetchConversations(0, false); // Refresh top items
+          }
+        } catch (e) {
+          console.error("Error parsing websocket message", e);
         }
+      };
 
-        else if (['new_handoff_request', 'conversation_resolved', 'supervision_type_changed', 'conversation_taken_over'].includes(data.update)) {
-          fetchConversations();
-        }
-      } catch (e) {
-        console.error("Error parsing websocket message", e);
-      }
+      ws.onclose = () => {
+        console.log('WebSocket disconnected. Attempting to reconnect in 3 seconds...');
+        reconnectTimeout = setTimeout(connectWebSocket, 3000);
+      };
+
+      ws.onerror = (err) => {
+        console.error("WebSocket encountered an error:", err);
+        ws.close();
+      };
     };
 
-    ws.onclose = () => console.log('WebSocket disconnected');
+    connectWebSocket();
 
     return () => {
-        if (ws.readyState === 1) {
+        clearTimeout(reconnectTimeout);
+        if (ws && ws.readyState === 1) {
             ws.close();
         }
     };
@@ -286,12 +329,8 @@ function App() {
     if (!selectedConversation) return;
 
     const formData = new FormData();
-    if (messageData.file) {
-        formData.append('file', messageData.file);
-    }
-    if (messageData.text) {
-        formData.append('text', messageData.text);
-    }
+    if (messageData.file) formData.append('file', messageData.file);
+    if (messageData.text) formData.append('text', messageData.text);
 
     try {
         await authFetch(`${API_BASE_URL}/conversations/${selectedConversation.composite_id}/send`, {
@@ -384,6 +423,7 @@ function App() {
           onShowUserManagement={() => setActiveView('userManagement')}
           onShowConversations={() => setActiveView('conversations')}
           currentUser={currentUser}
+          onLoadMore={loadMoreConversations}
         />
 
         {activeView === 'conversations' && (
