@@ -32,7 +32,22 @@ const getUserFromToken = (token) => {
     }
 };
 
+const getTenantFromUrl = () => {
+    const hostname = window.location.hostname;
+    const parts = hostname.split('.');
+
+    const isLocalhost = hostname.includes('localhost');
+    const hasSubdomain = isLocalhost ? parts.length > 1 : parts.length > 2;
+
+    if (hasSubdomain && parts[0] !== 'www') {
+        return parts[0];
+    }
+    return null;
+};
+
 function App() {
+  const [tenant, setTenant] = useState(getTenantFromUrl());
+  const [isValidTenant, setIsValidTenant] = useState(null);
   const [token, setToken] = useState(() => localStorage.getItem('admin_token'));
   const [currentUser, setCurrentUser] = useState(() => getUserFromToken(localStorage.getItem('admin_token')));
   const [conversations, setConversations] = useState([]);
@@ -169,6 +184,38 @@ function App() {
         fetchConversations(nextSkip, true);
     }
   };
+
+
+useEffect(() => {
+    // If there is no subdomain at all, immediately fail validation
+    if (!tenant) {
+        setIsValidTenant(false);
+        return;
+    }
+
+    const validateTenant = async () => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/available-clients`);
+
+            if (!response.ok) {
+                throw new Error('Failed to fetch available clients.');
+            }
+
+            const validClients = await response.json();
+
+            if (validClients.includes(tenant)) {
+                setIsValidTenant(true);
+            } else {
+                setIsValidTenant(false);
+            }
+        } catch (error) {
+            console.error("Error validating tenant:", error);
+            setIsValidTenant(false);
+        }
+    };
+
+    validateTenant();
+  }, [tenant]);
 
   useEffect(() => {
     conversationsRef.current = conversations;
@@ -396,6 +443,20 @@ function App() {
     });
   };
 
+  if (isValidTenant === null) {
+      return <div className="flex items-center justify-center h-screen bg-gray-200">Validando cliente...</div>;
+  }
+
+  if (isValidTenant === false) {
+      // The 404 Not Found UI
+      return (
+          <div className="flex flex-col items-center justify-center h-screen w-screen bg-gray-100 font-sans">
+              <h1 className="text-6xl font-bold text-gray-800">404</h1>
+              <p className="text-xl text-gray-600 mt-4">Página não encontrada.</p>
+              <p className="text-md text-gray-500 mt-2">O cliente "{tenant}" não existe em nossa base de dados.</p>
+          </div>
+      );
+  }
 
   if (!token || !currentUser) {
     return <Login onLogin={handleLogin} apiBaseUrl={API_BASE_URL} />;
