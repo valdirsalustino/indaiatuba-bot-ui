@@ -8,13 +8,8 @@ import ChatWindow from './components/ChatWindow.jsx';
 import ConfirmationModal from './components/ConfirmationModal.jsx';
 import UserManagement from './components/UserManagement.jsx';
 
-const API_BASE_URL = '/api'; // The path we defined in the reverse proxy config
-
 // Logic to determine WebSocket protocol
 const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-const WEBSOCKET_URL = `${wsProtocol}//${window.location.host}/ws`;
-// const API_BASE_URL = 'http://localhost:8000';
-// const WEBSOCKET_URL = 'ws://localhost:8000/ws';
 
 const getUserFromToken = (token) => {
     if (!token) return null;
@@ -47,6 +42,13 @@ const getTenantFromUrl = () => {
 
 function App() {
   const [tenant, setTenant] = useState(getTenantFromUrl());
+
+  // Dynamic base URLs that include the tenant name
+  const apiBaseUrl = tenant ? `/api/${tenant}` : '/api';
+  const websocketUrl = tenant
+    ? `${wsProtocol}//${window.location.host}/ws/${tenant}`
+    : `${wsProtocol}//${window.location.host}/ws`;
+
   const [isValidTenant, setIsValidTenant] = useState(null);
   const [token, setToken] = useState(() => localStorage.getItem('admin_token'));
   const [currentUser, setCurrentUser] = useState(() => getUserFromToken(localStorage.getItem('admin_token')));
@@ -104,7 +106,8 @@ function App() {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await authFetch(`${API_BASE_URL}/conversations?days=30&limit=${LIMIT}&skip=${currentSkip}`);
+      // Using the dynamic apiBaseUrl
+      const response = await authFetch(`${apiBaseUrl}/conversations?days=30&limit=${LIMIT}&skip=${currentSkip}`);
       if (!response.ok) throw new Error('Failed to fetch conversations.');
 
       const serverData = await response.json();
@@ -174,7 +177,7 @@ function App() {
     } finally {
       setIsLoading(false);
     }
-  }, [token, authFetch]);
+  }, [token, authFetch, apiBaseUrl]);
 
   // Expose a loadMore function to pass to the ConversationList
   const loadMoreConversations = () => {
@@ -185,8 +188,7 @@ function App() {
     }
   };
 
-
-useEffect(() => {
+  useEffect(() => {
     // If there is no subdomain at all, immediately fail validation
     if (!tenant) {
         setIsValidTenant(false);
@@ -195,7 +197,7 @@ useEffect(() => {
 
     const validateTenant = async () => {
         try {
-            const response = await fetch(`${API_BASE_URL}/available-clients`);
+            const response = await fetch(`/api/available-clients`);
 
             if (!response.ok) {
                 throw new Error('Failed to fetch available clients.');
@@ -245,7 +247,7 @@ useEffect(() => {
     let reconnectTimeout;
 
     const connectWebSocket = () => {
-      ws = new WebSocket(WEBSOCKET_URL);
+      ws = new WebSocket(websocketUrl);
 
       ws.onopen = () => console.log('WebSocket connected');
 
@@ -344,7 +346,7 @@ useEffect(() => {
             ws.close();
         }
     };
-  }, [token, fetchConversations]);
+  }, [token, fetchConversations, websocketUrl]);
 
   useEffect(() => {
     if (selectedConversation?.composite_id) {
@@ -380,7 +382,7 @@ useEffect(() => {
     if (messageData.text) formData.append('text', messageData.text);
 
     try {
-        await authFetch(`${API_BASE_URL}/conversations/${selectedConversation.composite_id}/send`, {
+        await authFetch(`${apiBaseUrl}/conversations/${selectedConversation.composite_id}/send`, {
             method: 'POST',
             body: formData,
         });
@@ -411,7 +413,7 @@ useEffect(() => {
       isOpen: true,
       message: 'Tem certeza que deseja marcar esta conversa como resolvida?',
       onConfirm: () => handleApiCall(
-        `${API_BASE_URL}/conversations/${compositeId}/resolve`,
+        `${apiBaseUrl}/conversations/${compositeId}/resolve`,
         { method: 'POST' }
       ),
     });
@@ -422,7 +424,7 @@ useEffect(() => {
       isOpen: true,
       message: `Tem certeza que deseja transferir a conversa para o departamento ${newType}?`,
       onConfirm: () => handleApiCall(
-        `${API_BASE_URL}/conversations/${compositeId}/supervision-type`,
+        `${apiBaseUrl}/conversations/${compositeId}/supervision-type`,
         {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
@@ -437,7 +439,7 @@ useEffect(() => {
       isOpen: true,
       message: 'Tem certeza que deseja assumir esta conversa? O bot será desativado para este tópico.',
       onConfirm: () => handleApiCall(
-        `${API_BASE_URL}/conversations/${compositeId}/take-over`,
+        `${apiBaseUrl}/conversations/${compositeId}/take-over`,
         { method: 'POST' }
       ),
     });
@@ -459,7 +461,7 @@ useEffect(() => {
   }
 
   if (!token || !currentUser) {
-    return <Login onLogin={handleLogin} apiBaseUrl={API_BASE_URL} />;
+    return <Login onLogin={handleLogin} apiBaseUrl={apiBaseUrl} />;
   }
 
   return (
@@ -501,7 +503,7 @@ useEffect(() => {
         {activeView === 'userManagement' && currentUser.role === 'Admin' && (
             <UserManagement
                 token={token}
-                apiBaseUrl={API_BASE_URL}
+                apiBaseUrl={apiBaseUrl}
                 onAction={(message, onConfirm) => setModalState({ isOpen: true, message, onConfirm })}
                 currentUser={currentUser}
             />
