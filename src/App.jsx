@@ -7,6 +7,7 @@ import ConversationList from './components/ConversationList.jsx';
 import ChatWindow from './components/ChatWindow.jsx';
 import ConfirmationModal from './components/ConfirmationModal.jsx';
 import UserManagement from './components/UserManagement.jsx';
+import ClientConfigurations from './components/ClientConfigurations.jsx';
 
 // Logic to determine WebSocket protocol
 const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -484,6 +485,7 @@ function App() {
           anyNeedsAttention={anyNeedsAttention}
           isAdmin={currentUser.role === 'Admin'}
           onShowUserManagement={() => setActiveView('userManagement')}
+          onShowClientConfigs={() => setActiveView('clientConfigurations')}
           onShowConversations={() => setActiveView('conversations')}
           currentUser={currentUser}
           onLoadMore={loadMoreConversations}
@@ -506,6 +508,14 @@ function App() {
                 apiBaseUrl={apiBaseUrl}
                 onAction={(message, onConfirm) => setModalState({ isOpen: true, message, onConfirm })}
                 currentUser={currentUser}
+            />
+        )}
+
+        {activeView === 'clientConfigurations' && currentUser.role === 'Admin' && (
+            <ClientConfigurations
+                token={token}
+                apiBaseUrl={apiBaseUrl}
+                onClose={() => setActiveView('conversations')}
             />
         )}
       </div>
