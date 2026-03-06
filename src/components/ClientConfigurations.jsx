@@ -21,6 +21,12 @@ export default function ClientConfigurations({ apiBaseUrl, token }) {
     const [savingSportsUrlIndex, setSavingSportsUrlIndex] = useState(null);
     const [originalUrlToEdit, setOriginalUrlToEdit] = useState(null);
 
+    const [googleDriverId, setGoogleDriverId] = useState('');
+    const [loadingGoogleDriverId, setLoadingGoogleDriverId] = useState(false);
+    const [googleDriverIdError, setGoogleDriverIdError] = useState('');
+    const [isEditingGoogleDriverId, setIsEditingGoogleDriverId] = useState(false);
+    const [savingGoogleDriverId, setSavingGoogleDriverId] = useState(false);
+
     useEffect(() => {
         if (activeTab === 'systemPrompt' && apiBaseUrl && token) {
             const fetchSystemPrompt = async () => {
@@ -112,7 +118,30 @@ export default function ClientConfigurations({ apiBaseUrl, token }) {
                 }
             };
             fetchSportsUrls();
-        }
+        } else if (activeTab === 'googleDriverId' && apiBaseUrl && token) {
+          const fetchGoogleDriverId = async () => {
+              setLoadingGoogleDriverId(true);
+              setGoogleDriverIdError('');
+              try {
+                  const url = `${apiBaseUrl}/google-driver-id`;
+                  const response = await fetch(url, {
+                      headers: { 'Authorization': `Bearer ${token}` }
+                  });
+                  if (response.ok) {
+                      const data = await response.json();
+                      setGoogleDriverId(data.folder_id || '');
+                  } else if (response.status !== 404) {
+                      const errorData = await response.json().catch(() => ({}));
+                      throw new Error(errorData.detail || 'Erro ao carregar Google Driver ID');
+                  }
+              } catch (error) {
+                  setGoogleDriverIdError(error.message);
+              } finally {
+                  setLoadingGoogleDriverId(false);
+              }
+          };
+    fetchGoogleDriverId();
+}
     }, [activeTab, apiBaseUrl, token]);
 
     const handleSavePrompt = async () => {
@@ -248,6 +277,33 @@ export default function ClientConfigurations({ apiBaseUrl, token }) {
         }
     };
 
+    const handleSaveGoogleDriverId = async () => {
+        setSavingGoogleDriverId(true);
+        setGoogleDriverIdError('');
+        try {
+            const url = `${apiBaseUrl}/google-driver-id`;
+            const response = await fetch(url, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ folder_id: googleDriverId })
+            });
+
+            if (response.ok) {
+                setIsEditingGoogleDriverId(false);
+            } else {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.detail || 'Erro ao salvar Google Driver ID');
+            }
+        } catch (error) {
+            setGoogleDriverIdError(error.message);
+        } finally {
+            setSavingGoogleDriverId(false);
+        }
+    };
+
     return (
         <div className="flex-grow flex items-center justify-center bg-gray-50">
             <div className="w-full max-w-4xl p-8 bg-white rounded-lg shadow-md">
@@ -284,6 +340,12 @@ export default function ClientConfigurations({ apiBaseUrl, token }) {
                             } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
                         >
                             URL de esportes
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('googleDriverId')}
+                            className={`${activeTab === 'googleDriverId' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500'} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
+                        >
+                            Google Driver ID
                         </button>
                     </nav>
                 </div>
@@ -423,6 +485,36 @@ export default function ClientConfigurations({ apiBaseUrl, token }) {
                                     </div>
                                 ))}
                             </div>
+                        )}
+                    </div>
+                )}
+                {activeTab === 'googleDriverId' && (
+                    <div>
+                        <div className="flex justify-between items-center mb-4">
+                            <h3 className="text-xl font-semibold text-gray-700">Google Driver ID</h3>
+                            {!loadingGoogleDriverId && (
+                                <div>
+                                    {!isEditingGoogleDriverId ? (
+                                        <button onClick={() => setIsEditingGoogleDriverId(true)} className="px-4 py-2 bg-blue-600 text-white rounded">Editar</button>
+                                    ) : (
+                                        <button onClick={handleSaveGoogleDriverId} disabled={savingGoogleDriverId} className="px-4 py-2 bg-green-600 text-white rounded">
+                                            {savingGoogleDriverId ? 'Salvando...' : 'Salvar'}
+                                        </button>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                        {loadingGoogleDriverId && <p className="text-blue-500">Carregando...</p>}
+                        {googleDriverIdError && <p className="text-red-500">{googleDriverIdError}</p>}
+                        {!loadingGoogleDriverId && (
+                            <input
+                                type="text"
+                                value={googleDriverId}
+                                onChange={(e) => setGoogleDriverId(e.target.value)}
+                                readOnly={!isEditingGoogleDriverId}
+                                className={`w-full p-3 border rounded-md ${!isEditingGoogleDriverId ? 'bg-gray-100' : ''}`}
+                                placeholder="Insira o ID da pasta do Google Drive"
+                            />
                         )}
                     </div>
                 )}
