@@ -316,7 +316,7 @@ export default function ClientConfigurations({ apiBaseUrl, token }) {
 
                         {loadingPrompt && <p className="text-blue-500">Carregando prompt...</p>}
                         {promptError && <p className="text-red-500">{promptError}</p>}
-                        {!loadingPrompt && !promptError && (
+                        {!loadingPrompt && (
                             <textarea
                                 value={systemPrompt}
                                 onChange={(e) => setSystemPrompt(e.target.value)}
@@ -356,7 +356,7 @@ export default function ClientConfigurations({ apiBaseUrl, token }) {
 
                         {loadingNewsUrl && <p className="text-blue-500">Carregando URL...</p>}
                         {newsUrlError && <p className="text-red-500">{newsUrlError}</p>}
-                        {!loadingNewsUrl && !newsUrlError && (
+                        {!loadingNewsUrl && (
                             <input
                                 type="text"
                                 value={newsUrl}
@@ -383,8 +383,8 @@ export default function ClientConfigurations({ apiBaseUrl, token }) {
 
                         {loadingSportsUrls && <p className="text-blue-500">Carregando URLs...</p>}
                         {sportsUrlsError && <p className="text-red-500">{sportsUrlsError}</p>}
-                        {!loadingSportsUrls && !sportsUrlsError && (
-                            <div className="space-y-4">
+                        {!loadingSportsUrls && (
+                            <div className="space-y-4 max-h-96 overflow-y-auto pr-2max-h-96 overflow-y-auto pr-2">
                                 {sportsUrls.length === 0 && !editingSportsUrlIndex && (
                                     <p className="text-gray-500">Nenhuma URL de esportes encontrada.</p>
                                 )}
