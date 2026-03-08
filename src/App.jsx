@@ -36,7 +36,14 @@ const getTenantFromUrl = () => {
     const hasSubdomain = isLocalhost ? parts.length > 1 : parts.length > 2;
 
     if (hasSubdomain && parts[0] !== 'www') {
-        return parts[0];
+        let extractedTenant = parts[0];
+        
+        // Clean up the '-test' suffix if running in the test environment
+        if (extractedTenant.endsWith('-test')) {
+            extractedTenant = extractedTenant.replace(/-test$/, ''); 
+        }
+        
+        return extractedTenant;
     }
     return null;
 };
