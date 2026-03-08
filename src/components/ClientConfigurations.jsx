@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from 'react';
 
 export default function ClientConfigurations({ apiBaseUrl, token }) {
-    const [activeTab, setActiveTab] = useState('systemPrompt');
+    const [activeTab, setActiveTab] = useState('clientInfoAndPrompt');
+
+    const [clientName, setClientName] = useState('');
+    const [website, setWebsite] = useState('');
     const [systemPrompt, setSystemPrompt] = useState('');
-    const [loadingPrompt, setLoadingPrompt] = useState(false);
-    const [promptError, setPromptError] = useState('');
-    const [isEditingPrompt, setIsEditingPrompt] = useState(false);
-    const [savingPrompt, setSavingPrompt] = useState(false);
+    const [loadingClientPrompt, setLoadingClientPrompt] = useState(false);
+    const [clientPromptError, setClientPromptError] = useState('');
+    const [isEditingClientPrompt, setIsEditingClientPrompt] = useState(false);
+    const [savingClientPrompt, setSavingClientPrompt] = useState(false);
 
     const [newsUrl, setNewsUrl] = useState('');
     const [loadingNewsUrl, setLoadingNewsUrl] = useState(false);
@@ -40,13 +43,14 @@ export default function ClientConfigurations({ apiBaseUrl, token }) {
     const [savingSecrets, setSavingSecrets] = useState(false);
 
     useEffect(() => {
-        if (activeTab === 'systemPrompt' && apiBaseUrl && token) {
-            const fetchSystemPrompt = async () => {
-                setLoadingPrompt(true);
-                setPromptError('');
+        // --- FETCH COMBINADO: Cliente Info e Prompt ---
+        if (activeTab === 'clientInfoAndPrompt' && apiBaseUrl && token) {
+            const fetchClientPromptData = async () => {
+                setLoadingClientPrompt(true);
+                setClientPromptError('');
                 try {
-                    const url = `${apiBaseUrl}/system-prompt`;
-                    const response = await fetch(url, {
+                    const infoUrl = `${apiBaseUrl}/client-info`;
+                    const infoResponse = await fetch(infoUrl, {
                         method: 'GET',
                         headers: {
                             'Authorization': `Bearer ${token}`,
@@ -54,22 +58,43 @@ export default function ClientConfigurations({ apiBaseUrl, token }) {
                         }
                     });
 
-                    if (response.ok) {
-                        const data = await response.json();
-                        setSystemPrompt(data.prompt || '');
-                    } else if (response.status !== 404) { // 404 is ok, just means no prompt yet
-                        const errorData = await response.json().catch(() => ({}));
-                        throw new Error(errorData.detail || `Erro ao carregar prompt: Status ${response.status}`);
+                    if (infoResponse.ok) {
+                        const infoData = await infoResponse.json();
+                        setClientName(infoData.client_name || '');
+                        setWebsite(infoData.website || '');
+                    } else if (infoResponse.status !== 404) {
+                        const errorData = await infoResponse.json().catch(() => ({}));
+                        throw new Error(errorData.detail || `Erro ao carregar Info do Cliente: Status ${infoResponse.status}`);
                     } else {
-                        setSystemPrompt(''); // Explicitly clear on 404
+                        setClientName('');
+                        setWebsite('');
+                    }
+
+                    const promptUrl = `${apiBaseUrl}/system-prompt`;
+                    const promptResponse = await fetch(promptUrl, {
+                        method: 'GET',
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json'
+                        }
+                    });
+
+                    if (promptResponse.ok) {
+                        const promptData = await promptResponse.json();
+                        setSystemPrompt(promptData.prompt || '');
+                    } else if (promptResponse.status !== 404) {
+                        const errorData = await promptResponse.json().catch(() => ({}));
+                        throw new Error(errorData.detail || `Erro ao carregar prompt: Status ${promptResponse.status}`);
+                    } else {
+                        setSystemPrompt('');
                     }
                 } catch (error) {
-                    setPromptError(error.message || 'Falha ao conectar com o servidor.');
+                    setClientPromptError(error.message || 'Falha ao conectar com o servidor.');
                 } finally {
-                    setLoadingPrompt(false);
+                    setLoadingClientPrompt(false);
                 }
             };
-            fetchSystemPrompt();
+            fetchClientPromptData();
         } else if (activeTab === 'newsUrl' && apiBaseUrl && token) {
             const fetchNewsUrl = async () => {
                 setLoadingNewsUrl(true);
@@ -87,11 +112,11 @@ export default function ClientConfigurations({ apiBaseUrl, token }) {
                     if (response.ok) {
                         const data = await response.json();
                         setNewsUrl(data.url || '');
-                    } else if (response.status !== 404) { // 404 is ok, just means no URL yet
+                    } else if (response.status !== 404) {
                         const errorData = await response.json().catch(() => ({}));
                         throw new Error(errorData.detail || `Erro ao carregar URL de notícias: Status ${response.status}`);
                     } else {
-                        setNewsUrl(''); // Explicitly clear on 404
+                        setNewsUrl('');
                     }
                 } catch (error) {
                     setNewsUrlError(error.message || 'Falha ao conectar com o servidor.');
@@ -117,11 +142,11 @@ export default function ClientConfigurations({ apiBaseUrl, token }) {
                     if (response.ok) {
                         const data = await response.json();
                         setSportsUrls(Array.isArray(data) ? data : []);
-                    } else if (response.status !== 404) { // 404 is ok, just means no URLs yet
+                    } else if (response.status !== 404) {
                         const errorData = await response.json().catch(() => ({}));
                         throw new Error(errorData.detail || `Erro ao carregar URLs de esportes: Status ${response.status}`);
                     } else {
-                        setSportsUrls([]); // Explicitly clear on 404
+                        setSportsUrls([]);
                     }
                 } catch (error) {
                     setSportsUrlsError(error.message || 'Falha ao conectar com o servidor.');
@@ -183,12 +208,27 @@ export default function ClientConfigurations({ apiBaseUrl, token }) {
         }
     }, [activeTab, apiBaseUrl, token]);
 
-    const handleSavePrompt = async () => {
-        setSavingPrompt(true);
-        setPromptError('');
+    const handleSaveClientPrompt = async () => {
+        setSavingClientPrompt(true);
+        setClientPromptError('');
         try {
-            const url = `${apiBaseUrl}/system-prompt`;
-            const response = await fetch(url, {
+            const infoUrl = `${apiBaseUrl}/client-info`;
+            const infoResponse = await fetch(infoUrl, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ client_name: clientName, website: website })
+            });
+
+            if (!infoResponse.ok) {
+                const errorData = await infoResponse.json().catch(() => ({}));
+                throw new Error(errorData.detail || `Erro ao salvar Info do Cliente: Status ${infoResponse.status}`);
+            }
+
+            const promptUrl = `${apiBaseUrl}/system-prompt`;
+            const promptResponse = await fetch(promptUrl, {
                 method: 'PUT',
                 headers: {
                     'Authorization': `Bearer ${token}`,
@@ -197,16 +237,16 @@ export default function ClientConfigurations({ apiBaseUrl, token }) {
                 body: JSON.stringify({ prompt: systemPrompt })
             });
 
-            if (response.ok) {
-                setIsEditingPrompt(false);
-            } else {
-                const errorData = await response.json().catch(() => ({}));
-                throw new Error(errorData.detail || `Erro ao salvar prompt: Status ${response.status}`);
+            if (!promptResponse.ok) {
+                const errorData = await promptResponse.json().catch(() => ({}));
+                throw new Error(errorData.detail || `Erro ao salvar prompt: Status ${promptResponse.status}`);
             }
+
+            setIsEditingClientPrompt(false);
         } catch (error) {
-            setPromptError(error.message || 'Falha ao salvar prompt.');
+            setClientPromptError(error.message || 'Falha ao salvar dados.');
         } finally {
-            setSavingPrompt(false);
+            setSavingClientPrompt(false);
         }
     };
 
@@ -285,7 +325,7 @@ export default function ClientConfigurations({ apiBaseUrl, token }) {
     const handleAddSportsUrl = () => {
         setSportsUrls([...sportsUrls, '']);
         setEditingSportsUrlIndex(sportsUrls.length);
-        setOriginalUrlToEdit(''); // A new item has no original URL
+        setOriginalUrlToEdit('');
     };
 
     const handleRemoveSportsUrl = async (indexToRemove) => {
@@ -294,16 +334,15 @@ export default function ClientConfigurations({ apiBaseUrl, token }) {
         try {
             const url = `${apiBaseUrl}/sports-urls`;
             const response = await fetch(url, {
-                method: 'DELETE', // Change to DELETE
+                method: 'DELETE',
                 headers: {
                     'Authorization': `Bearer ${token}`,
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({ url: urlToRemove }) // Send the specific URL to delete
+                body: JSON.stringify({ url: urlToRemove })
             });
 
             if (response.ok) {
-                // Update the UI state after successful backend deletion
                 const updatedUrls = sportsUrls.filter((_, index) => index !== indexToRemove);
                 setSportsUrls(updatedUrls);
                 setEditingSportsUrlIndex(null);
@@ -348,7 +387,6 @@ export default function ClientConfigurations({ apiBaseUrl, token }) {
         setSecretsError('');
         try {
             const url = `${apiBaseUrl}/secrets`;
-            // Only send fields that have been filled out to avoid overwriting with empty strings
             const payload = Object.fromEntries(
                 Object.entries(secrets).filter(([_, v]) => v !== '')
             );
@@ -365,7 +403,6 @@ export default function ClientConfigurations({ apiBaseUrl, token }) {
             if (response.ok) {
                 setIsEditingSecrets(false);
                 setSecrets({ whatsapp_access_token: '', whatsapp_phone_number_id: '', tavily_api_key: '', google_api_key: '' });
-                // Refresh metadata
                 setActiveTab('secrets');
             } else {
                 const errorData = await response.json().catch(() => ({}));
@@ -383,17 +420,17 @@ export default function ClientConfigurations({ apiBaseUrl, token }) {
             <div className="w-full max-w-4xl p-8 bg-white rounded-lg shadow-md">
                 <h2 className="text-2xl font-bold text-gray-700 mb-6">Configurações de Cliente</h2>
 
-                <div className="border-b border-gray-200 mb-4">
+                <div className="border-b border-gray-200 mb-4 overflow-x-auto">
                     <nav className="-mb-px flex space-x-8" aria-label="Tabs">
                         <button
-                            onClick={() => setActiveTab('systemPrompt')}
+                            onClick={() => setActiveTab('clientInfoAndPrompt')}
                             className={`${
-                                activeTab === 'systemPrompt'
+                                activeTab === 'clientInfoAndPrompt'
                                     ? 'border-blue-500 text-blue-600'
                                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                             } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
                         >
-                            Prompt do sistema
+                            Cliente info e prompt
                         </button>
                         <button
                             onClick={() => setActiveTab('newsUrl')}
@@ -430,42 +467,74 @@ export default function ClientConfigurations({ apiBaseUrl, token }) {
                     </nav>
                 </div>
 
-                {activeTab === 'systemPrompt' && (
+                {activeTab === 'clientInfoAndPrompt' && (
                     <div>
                         <div className="flex justify-between items-center mb-4">
-                            <h3 className="text-xl font-semibold text-gray-700">Prompt do Sistema</h3>
-                            {!loadingPrompt && (
+                            <h3 className="text-xl font-semibold text-gray-700">Informações e Prompt do Sistema</h3>
+                            {!loadingClientPrompt && (
                                 <div>
-                                    {!isEditingPrompt ? (
+                                    {!isEditingClientPrompt ? (
                                         <button
-                                            onClick={() => setIsEditingPrompt(true)}
+                                            onClick={() => setIsEditingClientPrompt(true)}
                                             className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 focus:outline-none"
                                         >
                                             Editar
                                         </button>
                                     ) : (
                                         <button
-                                            onClick={handleSavePrompt}
-                                            disabled={savingPrompt}
-                                            className={`px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 focus:outline-none ${savingPrompt ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                            onClick={handleSaveClientPrompt}
+                                            disabled={savingClientPrompt}
+                                            className={`px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 focus:outline-none ${savingClientPrompt ? 'opacity-50 cursor-not-allowed' : ''}`}
                                         >
-                                            {savingPrompt ? 'Salvando...' : 'Salvar'}
+                                            {savingClientPrompt ? 'Salvando...' : 'Salvar'}
                                         </button>
                                     )}
                                 </div>
                             )}
                         </div>
 
-                        {loadingPrompt && <p className="text-blue-500">Carregando prompt...</p>}
-                        {promptError && <p className="text-red-500">{promptError}</p>}
-                        {!loadingPrompt && (
-                            <textarea
-                                value={systemPrompt}
-                                onChange={(e) => setSystemPrompt(e.target.value)}
-                                readOnly={!isEditingPrompt}
-                                className={`w-full h-64 p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 resize-y overflow-auto ${!isEditingPrompt ? 'bg-gray-100' : ''}`}
-                                placeholder="Nenhum prompt do sistema encontrado."
-                            />
+                        {loadingClientPrompt && <p className="text-blue-500">Carregando dados...</p>}
+                        {clientPromptError && <p className="text-red-500">{clientPromptError}</p>}
+                        {!loadingClientPrompt && (
+                            <div className="space-y-6">
+                                {/* Informações do Cliente */}
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Nome do Cliente</label>
+                                        <input
+                                            type="text"
+                                            value={clientName}
+                                            onChange={(e) => setClientName(e.target.value)}
+                                            readOnly={!isEditingClientPrompt}
+                                            className={`w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 ${!isEditingClientPrompt ? 'bg-gray-100' : ''}`}
+                                            placeholder="Insira o nome do cliente"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Website</label>
+                                        <input
+                                            type="text"
+                                            value={website}
+                                            onChange={(e) => setWebsite(e.target.value)}
+                                            readOnly={!isEditingClientPrompt}
+                                            className={`w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 ${!isEditingClientPrompt ? 'bg-gray-100' : ''}`}
+                                            placeholder="Insira o website"
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Prompt do Sistema */}
+                                <div>
+                                    <h4 className="text-lg font-semibold text-gray-700 mb-2">Prompt do Sistema</h4>
+                                    <textarea
+                                        value={systemPrompt}
+                                        onChange={(e) => setSystemPrompt(e.target.value)}
+                                        readOnly={!isEditingClientPrompt}
+                                        className={`w-full h-64 p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 resize-y overflow-auto ${!isEditingClientPrompt ? 'bg-gray-100' : ''}`}
+                                        placeholder="Nenhum prompt do sistema encontrado."
+                                    />
+                                </div>
+                            </div>
                         )}
                     </div>
                 )}
@@ -526,7 +595,7 @@ export default function ClientConfigurations({ apiBaseUrl, token }) {
                         {loadingSportsUrls && <p className="text-blue-500">Carregando URLs...</p>}
                         {sportsUrlsError && <p className="text-red-500">{sportsUrlsError}</p>}
                         {!loadingSportsUrls && (
-                            <div className="space-y-4 max-h-96 overflow-y-auto pr-2max-h-96 overflow-y-auto pr-2">
+                            <div className="space-y-4 max-h-96 overflow-y-auto pr-2">
                                 {sportsUrls.length === 0 && !editingSportsUrlIndex && (
                                     <p className="text-gray-500">Nenhuma URL de esportes encontrada.</p>
                                 )}
@@ -599,6 +668,7 @@ export default function ClientConfigurations({ apiBaseUrl, token }) {
                         )}
                     </div>
                 )}
+
                 {activeTab === 'secrets' && (
                     <div className="space-y-6">
                         <div className="flex justify-between items-center">
