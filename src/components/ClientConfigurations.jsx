@@ -27,6 +27,18 @@ export default function ClientConfigurations({ apiBaseUrl, token }) {
     const [isEditingGoogleDriverId, setIsEditingGoogleDriverId] = useState(false);
     const [savingGoogleDriverId, setSavingGoogleDriverId] = useState(false);
 
+    const [secrets, setSecrets] = useState({
+        whatsapp_access_token: '',
+        whatsapp_phone_number_id: '',
+        tavily_api_key: '',
+        google_api_key: ''
+    });
+    const [secretsMetadata, setSecretsMetadata] = useState(null);
+    const [loadingSecrets, setLoadingSecrets] = useState(false);
+    const [secretsError, setSecretsError] = useState('');
+    const [isEditingSecrets, setIsEditingSecrets] = useState(false);
+    const [savingSecrets, setSavingSecrets] = useState(false);
+
     useEffect(() => {
         if (activeTab === 'systemPrompt' && apiBaseUrl && token) {
             const fetchSystemPrompt = async () => {
@@ -119,29 +131,56 @@ export default function ClientConfigurations({ apiBaseUrl, token }) {
             };
             fetchSportsUrls();
         } else if (activeTab === 'googleDriverId' && apiBaseUrl && token) {
-          const fetchGoogleDriverId = async () => {
-              setLoadingGoogleDriverId(true);
-              setGoogleDriverIdError('');
-              try {
-                  const url = `${apiBaseUrl}/google-driver-id`;
-                  const response = await fetch(url, {
-                      headers: { 'Authorization': `Bearer ${token}` }
-                  });
-                  if (response.ok) {
-                      const data = await response.json();
-                      setGoogleDriverId(data.folder_id || '');
-                  } else if (response.status !== 404) {
-                      const errorData = await response.json().catch(() => ({}));
-                      throw new Error(errorData.detail || 'Erro ao carregar Google Driver ID');
-                  }
-              } catch (error) {
-                  setGoogleDriverIdError(error.message);
-              } finally {
-                  setLoadingGoogleDriverId(false);
-              }
-          };
-    fetchGoogleDriverId();
-}
+             const fetchGoogleDriverId = async () => {
+                 setLoadingGoogleDriverId(true);
+                 setGoogleDriverIdError('');
+                 try {
+                     const url = `${apiBaseUrl}/google-driver-id`;
+                     const response = await fetch(url, {
+                         headers: { 'Authorization': `Bearer ${token}` }
+                     });
+                     if (response.ok) {
+                         const data = await response.json();
+                         setGoogleDriverId(data.folder_id || '');
+                     } else if (response.status !== 404) {
+                         const errorData = await response.json().catch(() => ({}));
+                         throw new Error(errorData.detail || 'Erro ao carregar Google Driver ID');
+                     }
+                 } catch (error) {
+                     setGoogleDriverIdError(error.message);
+                 } finally {
+                     setLoadingGoogleDriverId(false);
+                 }
+             };
+            fetchGoogleDriverId();
+        }  else if (activeTab === 'secrets' && apiBaseUrl && token) {
+            const fetchSecretsMetadata = async () => {
+                setLoadingSecrets(true);
+                setSecretsError('');
+                try {
+                    const url = `${apiBaseUrl}/secrets`;
+                    const response = await fetch(url, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    if (response.ok) {
+                        const data = await response.json();
+                        setSecretsMetadata(data);
+                        setSecrets(prev => ({
+                            ...prev,
+                            whatsapp_phone_number_id: data.whatsapp_phone_number_id || ''
+                        }));
+                    } else {
+                        const errorData = await response.json().catch(() => ({}));
+                        throw new Error(errorData.detail || 'Erro ao carregar metadados de segredos');
+                    }
+                } catch (error) {
+                    setSecretsError(error.message);
+                } finally {
+                    setLoadingSecrets(false);
+                }
+            };
+            fetchSecretsMetadata();
+        }
     }, [activeTab, apiBaseUrl, token]);
 
     const handleSavePrompt = async () => {
@@ -304,6 +343,41 @@ export default function ClientConfigurations({ apiBaseUrl, token }) {
         }
     };
 
+    const handleSaveSecrets = async () => {
+        setSavingSecrets(true);
+        setSecretsError('');
+        try {
+            const url = `${apiBaseUrl}/secrets`;
+            // Only send fields that have been filled out to avoid overwriting with empty strings
+            const payload = Object.fromEntries(
+                Object.entries(secrets).filter(([_, v]) => v !== '')
+            );
+
+            const response = await fetch(url, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(payload)
+            });
+
+            if (response.ok) {
+                setIsEditingSecrets(false);
+                setSecrets({ whatsapp_access_token: '', whatsapp_phone_number_id: '', tavily_api_key: '', google_api_key: '' });
+                // Refresh metadata
+                setActiveTab('secrets');
+            } else {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.detail || 'Erro ao salvar segredos');
+            }
+        } catch (error) {
+            setSecretsError(error.message);
+        } finally {
+            setSavingSecrets(false);
+        }
+    };
+
     return (
         <div className="flex-grow flex items-center justify-center bg-gray-50">
             <div className="w-full max-w-4xl p-8 bg-white rounded-lg shadow-md">
@@ -346,6 +420,12 @@ export default function ClientConfigurations({ apiBaseUrl, token }) {
                             className={`${activeTab === 'googleDriverId' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500'} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
                         >
                             Google Driver ID
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('secrets')}
+                            className={`${activeTab === 'secrets' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500'} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
+                        >
+                            Segredos (API Keys)
                         </button>
                     </nav>
                 </div>
@@ -488,6 +568,7 @@ export default function ClientConfigurations({ apiBaseUrl, token }) {
                         )}
                     </div>
                 )}
+
                 {activeTab === 'googleDriverId' && (
                     <div>
                         <div className="flex justify-between items-center mb-4">
@@ -515,6 +596,61 @@ export default function ClientConfigurations({ apiBaseUrl, token }) {
                                 className={`w-full p-3 border rounded-md ${!isEditingGoogleDriverId ? 'bg-gray-100' : ''}`}
                                 placeholder="Insira o ID da pasta do Google Drive"
                             />
+                        )}
+                    </div>
+                )}
+                {activeTab === 'secrets' && (
+                    <div className="space-y-6">
+                        <div className="flex justify-between items-center">
+                            <h3 className="text-xl font-semibold text-gray-700">Configuração de Segredos</h3>
+                            {!loadingSecrets && (
+                                <button
+                                    onClick={() => isEditingSecrets ? handleSaveSecrets() : setIsEditingSecrets(true)}
+                                    className={`px-4 py-2 text-white rounded ${isEditingSecrets ? 'bg-green-600' : 'bg-blue-600'}`}
+                                >
+                                    {savingSecrets ? 'Salvando...' : isEditingSecrets ? 'Salvar Alterações' : 'Editar Segredos'}
+                                </button>
+                            )}
+                        </div>
+
+                        {secretsError && <p className="text-red-500">{secretsError}</p>}
+
+                        <div className="grid grid-cols-1 gap-4">
+                            {[
+                                { id: 'whatsapp_access_token', label: 'WhatsApp Access Token', meta: 'has_whatsapp_token' },
+                                { id: 'tavily_api_key', label: 'Tavily API Key', meta: 'has_tavily_key' },
+                                { id: 'google_api_key', label: 'Google API Key', meta: 'has_google_key' }
+                            ].map((field) => (
+                                <div key={field.id}>
+                                    <label className="block text-sm font-medium text-gray-600 mb-1">
+                                        {field.label} {secretsMetadata?.[field.meta] && <span className="text-green-600 text-xs">(Configurado)</span>}
+                                    </label>
+                                    <input
+                                        type="password"
+                                        placeholder={isEditingSecrets ? `Insira o novo ${field.label}` : "••••••••••••••••"}
+                                        disabled={!isEditingSecrets}
+                                        value={secrets[field.id]}
+                                        onChange={(e) => setSecrets({ ...secrets, [field.id]: e.target.value })}
+                                        className="w-full p-3 border rounded-md disabled:bg-gray-100"
+                                    />
+                                </div>
+                            ))}
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-600 mb-1">WhatsApp Phone Number ID</label>
+                                <input
+                                    type="text"
+                                    disabled={!isEditingSecrets}
+                                    value={secrets.whatsapp_phone_number_id}
+                                    onChange={(e) => setSecrets({ ...secrets, whatsapp_phone_number_id: e.target.value })}
+                                    className="w-full p-3 border rounded-md disabled:bg-gray-100"
+                                    placeholder="Ex: 83390616979999"
+                                />
+                            </div>
+                        </div>
+
+                        {secretsMetadata?.updated_at && (
+                            <p className="text-xs text-gray-400 mt-4 italic">Última atualização: {new Date(secretsMetadata.updated_at).toLocaleString()}</p>
                         )}
                     </div>
                 )}
