@@ -30,6 +30,9 @@ export default function ClientConfigurations({ apiBaseUrl, token }) {
     const [isEditingGoogleDriverId, setIsEditingGoogleDriverId] = useState(false);
     const [savingGoogleDriverId, setSavingGoogleDriverId] = useState(false);
 
+    const [originalClientInfo, setOriginalClientInfo] = useState({ name: '', website: '' });
+    const [originalSystemPrompt, setOriginalSystemPrompt] = useState('');
+
     const [secrets, setSecrets] = useState({
         whatsapp_access_token: '',
         whatsapp_phone_number_id: '',
@@ -62,6 +65,7 @@ export default function ClientConfigurations({ apiBaseUrl, token }) {
                         const infoData = await infoResponse.json();
                         setClientName(infoData.client_name || '');
                         setWebsite(infoData.website || '');
+                        setOriginalClientInfo({ name: infoData.client_name || '', website: infoData.website || '' });
                     } else if (infoResponse.status !== 404) {
                         const errorData = await infoResponse.json().catch(() => ({}));
                         throw new Error(errorData.detail || `Erro ao carregar Info do Cliente: Status ${infoResponse.status}`);
@@ -82,6 +86,7 @@ export default function ClientConfigurations({ apiBaseUrl, token }) {
                     if (promptResponse.ok) {
                         const promptData = await promptResponse.json();
                         setSystemPrompt(promptData.prompt || '');
+                        setOriginalSystemPrompt(promptData.prompt || '');
                     } else if (promptResponse.status !== 404) {
                         const errorData = await promptResponse.json().catch(() => ({}));
                         throw new Error(errorData.detail || `Erro ao carregar prompt: Status ${promptResponse.status}`);
@@ -212,34 +217,38 @@ export default function ClientConfigurations({ apiBaseUrl, token }) {
         setSavingClientPrompt(true);
         setClientPromptError('');
         try {
-            const infoUrl = `${apiBaseUrl}/client-info`;
-            const infoResponse = await fetch(infoUrl, {
-                method: 'PUT',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ client_name: clientName, website: website })
-            });
+            // Only send the Client Info request if it actually changed
+            if (clientName !== originalClientInfo.name || website !== originalClientInfo.website) {
+                const infoUrl = `${apiBaseUrl}/client-info`;
+                const infoResponse = await fetch(infoUrl, {
+                    method: 'PUT',
+                    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ client_name: clientName, website: website })
+                });
 
-            if (!infoResponse.ok) {
-                const errorData = await infoResponse.json().catch(() => ({}));
-                throw new Error(errorData.detail || `Erro ao salvar Info do Cliente: Status ${infoResponse.status}`);
+                if (!infoResponse.ok) {
+                    const errorData = await infoResponse.json().catch(() => ({}));
+                    throw new Error(errorData.detail || `Erro ao salvar Info do Cliente: Status ${infoResponse.status}`);
+                }
+                // Update original state to reflect the new saved baseline
+                setOriginalClientInfo({ name: clientName, website: website });
             }
 
-            const promptUrl = `${apiBaseUrl}/system-prompt`;
-            const promptResponse = await fetch(promptUrl, {
-                method: 'PUT',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ prompt: systemPrompt })
-            });
+            // Only send the System Prompt request if it actually changed
+            if (systemPrompt !== originalSystemPrompt) {
+                const promptUrl = `${apiBaseUrl}/system-prompt`;
+                const promptResponse = await fetch(promptUrl, {
+                    method: 'PUT',
+                    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prompt: systemPrompt })
+                });
 
-            if (!promptResponse.ok) {
-                const errorData = await promptResponse.json().catch(() => ({}));
-                throw new Error(errorData.detail || `Erro ao salvar prompt: Status ${promptResponse.status}`);
+                if (!promptResponse.ok) {
+                    const errorData = await promptResponse.json().catch(() => ({}));
+                    throw new Error(errorData.detail || `Erro ao salvar prompt: Status ${promptResponse.status}`);
+                }
+                // Update original state
+                setOriginalSystemPrompt(systemPrompt);
             }
 
             setIsEditingClientPrompt(false);
