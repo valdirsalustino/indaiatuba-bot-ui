@@ -318,33 +318,46 @@ export default function ClientConfigurations({ apiBaseUrl, token, onAction }) {
 
     // --- Department Handlers ---
     const handleSaveDepartment = async (index) => {
-        setSavingDepartmentIndex(index);
-        setDepartmentsError('');
         const currentDepartment = departments[index];
 
-        try {
-            const url = `${apiBaseUrl}/departments`;
-            const payload = { department: currentDepartment };
-            if (originalDepartmentToEdit && originalDepartmentToEdit !== '') {
-                payload.old_department = originalDepartmentToEdit;
-            }
-            const response = await fetch(url, {
-                method: 'PUT',
-                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
+        // Isolate the actual save API call
+        const executeSave = async () => {
+            setSavingDepartmentIndex(index);
+            setDepartmentsError('');
+            try {
+                const url = `${apiBaseUrl}/departments`;
+                const payload = { department: currentDepartment };
+                if (originalDepartmentToEdit && originalDepartmentToEdit !== '') {
+                    payload.old_department = originalDepartmentToEdit;
+                }
+                const response = await fetch(url, {
+                    method: 'PUT',
+                    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
 
-            if (response.ok) {
-                setEditingDepartmentIndex(null);
-                setOriginalDepartmentToEdit(null);
-            } else {
-                const errorData = await response.json().catch(() => ({}));
-                setDepartmentsError(errorData.detail || `Erro ao salvar departamento: Status ${response.status}`);
+                if (response.ok) {
+                    setEditingDepartmentIndex(null);
+                    setOriginalDepartmentToEdit(null);
+                } else {
+                    const errorData = await response.json().catch(() => ({}));
+                    setDepartmentsError(errorData.detail || `Erro ao salvar departamento: Status ${response.status}`);
+                }
+            } catch (error) {
+                setDepartmentsError(error.message || 'Falha ao salvar departamento.');
+            } finally {
+                setSavingDepartmentIndex(null);
             }
-        } catch (error) {
-            setDepartmentsError(error.message || 'Falha ao salvar departamento.');
-        } finally {
-            setSavingDepartmentIndex(null);
+        };
+
+        // Trigger warning ONLY if it's an edit AND the name was actually changed
+        if (originalDepartmentToEdit && originalDepartmentToEdit !== '' && originalDepartmentToEdit !== currentDepartment) {
+            onAction(
+                `Atenção: alterar o nome deste departamento pode desvincular a Role (papel) dos usuários associados a ele. Revise a tela de Gerenciamento de Usuários após essa edição! Confirmar alteração?`,
+                executeSave
+            );
+        } else {
+            executeSave();
         }
     };
 
@@ -362,8 +375,9 @@ export default function ClientConfigurations({ apiBaseUrl, token, onAction }) {
 
     const handleRemoveDepartment = (indexToRemove) => {
         const departmentToRemove = departments[indexToRemove];
+
         onAction(
-            `Você tem certeza que quer remover o departamento "${departmentToRemove}"?`,
+            `Você tem certeza que quer remover o departamento "${departmentToRemove}"? Atenção: usuários vinculados a este departamento perderão sua associação. Revise a tela de Gerenciamento de Usuários após esta ação!`,
             async () => {
                 setDepartmentsError('');
                 try {
