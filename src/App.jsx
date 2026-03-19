@@ -342,7 +342,18 @@ function App() {
             });
           }
           else if (['new_handoff_request', 'conversation_resolved', 'supervision_type_changed', 'conversation_taken_over'].includes(data.update)) {
-            fetchConversations(0, false); // Refresh top items
+
+            if (data.update === 'new_handoff_request') {
+              try {
+                const pingSound = new Audio('/ping.mp3');
+                pingSound.play().catch(err => {
+                  console.warn("Navegador bloqueou a reprodução de áudio. O usuário precisa interagir com a página primeiro.", err);
+                });
+              } catch (err) {
+                console.error("Erro ao tentar tocar o áudio:", err);
+              }
+            }
+            fetchConversations(0, false);
           }
         } catch (e) {
           console.error("Error parsing websocket message", e);
