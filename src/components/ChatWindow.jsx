@@ -30,13 +30,12 @@ const MediaRenderer = ({ msg }) => {
     }
 };
 
-export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved, onInitiateTransfer, onTakeOver, currentUser }) {
+export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved, onInitiateTransfer, onTakeOver, currentUser, departments = [] }) {
   const [editorHtml, setEditorHtml] = useState('');
   const [attachedFile, setAttachedFile] = useState(null);
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
   const quillRef = useRef(null);
-  const allSupervisionTypes = ["Social", "Administração", "Esporte, Cultura e Artes"];
 
   // --- TURNDOWN SERVICE SETUP ---
   const turndownService = useMemo(() => {
@@ -164,7 +163,7 @@ export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved
 
   const needsAttention = conversation.status === 'open' && conversation.human_supervision;
   let lastMessageDate = null;
-  const availableTypes = allSupervisionTypes.filter( (type) => type !== conversation.human_supervision_type );
+  const availableTypes = departments.filter( (type) => type !== conversation.human_supervision_type );
   const isInputDisabled = conversation.status !== 'open' || !conversation.human_supervision;
 
   return (

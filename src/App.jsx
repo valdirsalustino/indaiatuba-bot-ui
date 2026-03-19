@@ -66,6 +66,7 @@ function App() {
   const [error, setError] = useState(null);
   const [anyNeedsAttention, setAnyNeedsAttention] = useState(false);
   const [activeView, setActiveView] = useState('conversations');
+  const [departments, setDepartments] = useState([]);
 
   // Pagination States
   const [skip, setSkip] = useState(0);
@@ -186,6 +187,19 @@ function App() {
       setIsLoading(false);
     }
   }, [token, authFetch, apiBaseUrl]);
+
+  const fetchDepartments = useCallback(async () => {
+    if (!token) return;
+    try {
+        const response = await authFetch(`${apiBaseUrl}/departments`);
+        if (response.ok) {
+            const data = await response.json();
+            setDepartments(Array.isArray(data) ? data : []);
+        }
+    } catch (error) {
+        console.error("Failed to fetch departments:", error);
+    }
+  }, [token, apiBaseUrl, authFetch]);
 
   // Expose a loadMore function to pass to the ConversationList
   const loadMoreConversations = () => {
@@ -365,6 +379,12 @@ function App() {
     }
   }, [conversations, selectedConversation?.composite_id]);
 
+  useEffect(() => {
+    if (token && (activeView === 'conversations' || activeView === 'userManagement')) {
+        fetchDepartments();
+    }
+  }, [token, activeView, fetchDepartments]);
+
   const handleLogin = (newToken) => {
     localStorage.setItem('admin_token', newToken);
     const user = getUserFromToken(newToken);
@@ -506,6 +526,7 @@ function App() {
                 onInitiateTransfer={handleUpdateSupervisionType}
                 onTakeOver={handleTakeOverConversation}
                 currentUser={currentUser}
+                departments={departments}
             />
         )}
 
@@ -515,6 +536,7 @@ function App() {
                 apiBaseUrl={apiBaseUrl}
                 onAction={(message, onConfirm) => setModalState({ isOpen: true, message, onConfirm })}
                 currentUser={currentUser}
+                departments={departments}
             />
         )}
 
@@ -523,6 +545,7 @@ function App() {
                 token={token}
                 apiBaseUrl={apiBaseUrl}
                 onClose={() => setActiveView('conversations')}
+                onAction={(message, onConfirm) => setModalState({ isOpen: true, message, onConfirm })}
             />
         )}
       </div>

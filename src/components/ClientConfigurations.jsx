@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 
-export default function ClientConfigurations({ apiBaseUrl, token }) {
+export default function ClientConfigurations({ apiBaseUrl, token, onAction }) {
     const [activeTab, setActiveTab] = useState('clientInfoAndPrompt');
 
+    // --- Client Info & Prompt States ---
     const [clientName, setClientName] = useState('');
     const [website, setWebsite] = useState('');
     const [systemPrompt, setSystemPrompt] = useState('');
@@ -10,13 +11,25 @@ export default function ClientConfigurations({ apiBaseUrl, token }) {
     const [clientPromptError, setClientPromptError] = useState('');
     const [isEditingClientPrompt, setIsEditingClientPrompt] = useState(false);
     const [savingClientPrompt, setSavingClientPrompt] = useState(false);
+    const [originalClientInfo, setOriginalClientInfo] = useState({ name: '', website: '' });
+    const [originalSystemPrompt, setOriginalSystemPrompt] = useState('');
 
+    // --- News URL States ---
     const [newsUrl, setNewsUrl] = useState('');
     const [loadingNewsUrl, setLoadingNewsUrl] = useState(false);
     const [newsUrlError, setNewsUrlError] = useState('');
     const [isEditingNewsUrl, setIsEditingNewsUrl] = useState(false);
     const [savingNewsUrl, setSavingNewsUrl] = useState(false);
 
+    // --- Departments States ---
+    const [departments, setDepartments] = useState([]);
+    const [loadingDepartments, setLoadingDepartments] = useState(false);
+    const [departmentsError, setDepartmentsError] = useState('');
+    const [editingDepartmentIndex, setEditingDepartmentIndex] = useState(null);
+    const [savingDepartmentIndex, setSavingDepartmentIndex] = useState(null);
+    const [originalDepartmentToEdit, setOriginalDepartmentToEdit] = useState(null);
+
+    // --- Sports URLs States ---
     const [sportsUrls, setSportsUrls] = useState([]);
     const [loadingSportsUrls, setLoadingSportsUrls] = useState(false);
     const [sportsUrlsError, setSportsUrlsError] = useState('');
@@ -24,15 +37,14 @@ export default function ClientConfigurations({ apiBaseUrl, token }) {
     const [savingSportsUrlIndex, setSavingSportsUrlIndex] = useState(null);
     const [originalUrlToEdit, setOriginalUrlToEdit] = useState(null);
 
+    // --- Google Driver ID States ---
     const [googleDriverId, setGoogleDriverId] = useState('');
     const [loadingGoogleDriverId, setLoadingGoogleDriverId] = useState(false);
     const [googleDriverIdError, setGoogleDriverIdError] = useState('');
     const [isEditingGoogleDriverId, setIsEditingGoogleDriverId] = useState(false);
     const [savingGoogleDriverId, setSavingGoogleDriverId] = useState(false);
 
-    const [originalClientInfo, setOriginalClientInfo] = useState({ name: '', website: '' });
-    const [originalSystemPrompt, setOriginalSystemPrompt] = useState('');
-
+    // --- Secrets States ---
     const [secrets, setSecrets] = useState({
         whatsapp_access_token: '',
         whatsapp_phone_number_id: '',
@@ -100,37 +112,51 @@ export default function ClientConfigurations({ apiBaseUrl, token }) {
                 }
             };
             fetchClientPromptData();
-        } else if (activeTab === 'newsUrl' && apiBaseUrl && token) {
-            const fetchNewsUrl = async () => {
+        }
+        // --- FETCH COMBINADO: Departamentos e URL de Notícias ---
+        else if (activeTab === 'departmentsAndNews' && apiBaseUrl && token) {
+            const fetchNewsAndDepartments = async () => {
                 setLoadingNewsUrl(true);
                 setNewsUrlError('');
-                try {
-                    const url = `${apiBaseUrl}/news-url`;
-                    const response = await fetch(url, {
-                        method: 'GET',
-                        headers: {
-                            'Authorization': `Bearer ${token}`,
-                            'Content-Type': 'application/json'
-                        }
-                    });
+                setLoadingDepartments(true);
+                setDepartmentsError('');
 
-                    if (response.ok) {
-                        const data = await response.json();
-                        setNewsUrl(data.url || '');
-                    } else if (response.status !== 404) {
-                        const errorData = await response.json().catch(() => ({}));
-                        throw new Error(errorData.detail || `Erro ao carregar URL de notícias: Status ${response.status}`);
-                    } else {
+                try {
+                    // Fetch News URL
+                    const newsResponse = await fetch(`${apiBaseUrl}/news-url`, {
+                        method: 'GET',
+                        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
+                    });
+                    if (newsResponse.ok) {
+                        const newsData = await newsResponse.json();
+                        setNewsUrl(newsData.url || '');
+                    } else if (newsResponse.status !== 404) {
                         setNewsUrl('');
+                    }
+
+                    // Fetch Departments
+                    const depResponse = await fetch(`${apiBaseUrl}/departments`, {
+                        method: 'GET',
+                        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
+                    });
+                    if (depResponse.ok) {
+                        const depData = await depResponse.json();
+                        setDepartments(Array.isArray(depData) ? depData : []);
+                    } else if (depResponse.status !== 404) {
+                        setDepartments([]);
                     }
                 } catch (error) {
                     setNewsUrlError(error.message || 'Falha ao conectar com o servidor.');
+                    setDepartmentsError('Falha ao conectar com o servidor para carregar departamentos.');
                 } finally {
                     setLoadingNewsUrl(false);
+                    setLoadingDepartments(false);
                 }
             };
-            fetchNewsUrl();
-        } else if (activeTab === 'sportsUrls' && apiBaseUrl && token) {
+            fetchNewsAndDepartments();
+        }
+        // --- FETCH: Sports URLs ---
+        else if (activeTab === 'sportsUrls' && apiBaseUrl && token) {
             const fetchSportsUrls = async () => {
                 setLoadingSportsUrls(true);
                 setSportsUrlsError('');
@@ -160,7 +186,9 @@ export default function ClientConfigurations({ apiBaseUrl, token }) {
                 }
             };
             fetchSportsUrls();
-        } else if (activeTab === 'googleDriverId' && apiBaseUrl && token) {
+        }
+        // --- FETCH: Google Driver ID ---
+        else if (activeTab === 'googleDriverId' && apiBaseUrl && token) {
              const fetchGoogleDriverId = async () => {
                  setLoadingGoogleDriverId(true);
                  setGoogleDriverIdError('');
@@ -183,7 +211,9 @@ export default function ClientConfigurations({ apiBaseUrl, token }) {
                  }
              };
             fetchGoogleDriverId();
-        }  else if (activeTab === 'secrets' && apiBaseUrl && token) {
+        }
+        // --- FETCH: Secrets ---
+        else if (activeTab === 'secrets' && apiBaseUrl && token) {
             const fetchSecretsMetadata = async () => {
                 setLoadingSecrets(true);
                 setSecretsError('');
@@ -213,11 +243,14 @@ export default function ClientConfigurations({ apiBaseUrl, token }) {
         }
     }, [activeTab, apiBaseUrl, token]);
 
+    // ==========================================
+    // HANDLERS
+    // ==========================================
+
     const handleSaveClientPrompt = async () => {
         setSavingClientPrompt(true);
         setClientPromptError('');
         try {
-            // Only send the Client Info request if it actually changed
             if (clientName !== originalClientInfo.name || website !== originalClientInfo.website) {
                 const infoUrl = `${apiBaseUrl}/client-info`;
                 const infoResponse = await fetch(infoUrl, {
@@ -230,11 +263,9 @@ export default function ClientConfigurations({ apiBaseUrl, token }) {
                     const errorData = await infoResponse.json().catch(() => ({}));
                     throw new Error(errorData.detail || `Erro ao salvar Info do Cliente: Status ${infoResponse.status}`);
                 }
-                // Update original state to reflect the new saved baseline
                 setOriginalClientInfo({ name: clientName, website: website });
             }
 
-            // Only send the System Prompt request if it actually changed
             if (systemPrompt !== originalSystemPrompt) {
                 const promptUrl = `${apiBaseUrl}/system-prompt`;
                 const promptResponse = await fetch(promptUrl, {
@@ -247,7 +278,6 @@ export default function ClientConfigurations({ apiBaseUrl, token }) {
                     const errorData = await promptResponse.json().catch(() => ({}));
                     throw new Error(errorData.detail || `Erro ao salvar prompt: Status ${promptResponse.status}`);
                 }
-                // Update original state
                 setOriginalSystemPrompt(systemPrompt);
             }
 
@@ -286,6 +316,80 @@ export default function ClientConfigurations({ apiBaseUrl, token }) {
         }
     };
 
+    // --- Department Handlers ---
+    const handleSaveDepartment = async (index) => {
+        setSavingDepartmentIndex(index);
+        setDepartmentsError('');
+        const currentDepartment = departments[index];
+
+        try {
+            const url = `${apiBaseUrl}/departments`;
+            const payload = { department: currentDepartment };
+            if (originalDepartmentToEdit && originalDepartmentToEdit !== '') {
+                payload.old_department = originalDepartmentToEdit;
+            }
+            const response = await fetch(url, {
+                method: 'PUT',
+                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (response.ok) {
+                setEditingDepartmentIndex(null);
+                setOriginalDepartmentToEdit(null);
+            } else {
+                const errorData = await response.json().catch(() => ({}));
+                setDepartmentsError(errorData.detail || `Erro ao salvar departamento: Status ${response.status}`);
+            }
+        } catch (error) {
+            setDepartmentsError(error.message || 'Falha ao salvar departamento.');
+        } finally {
+            setSavingDepartmentIndex(null);
+        }
+    };
+
+    const handleDepartmentChange = (index, value) => {
+        const newDepartments = [...departments];
+        newDepartments[index] = value;
+        setDepartments(newDepartments);
+    };
+
+    const handleAddDepartment = () => {
+        setDepartments([...departments, '']);
+        setEditingDepartmentIndex(departments.length);
+        setOriginalDepartmentToEdit('');
+    };
+
+    const handleRemoveDepartment = (indexToRemove) => {
+        const departmentToRemove = departments[indexToRemove];
+        onAction(
+            `Você tem certeza que quer remover o departamento "${departmentToRemove}"?`,
+            async () => {
+                setDepartmentsError('');
+                try {
+                    const url = `${apiBaseUrl}/departments`;
+                    const response = await fetch(url, {
+                        method: 'DELETE',
+                        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ department: departmentToRemove })
+                    });
+
+                    if (response.ok) {
+                        const updatedDeps = departments.filter((_, index) => index !== indexToRemove);
+                        setDepartments(updatedDeps);
+                        setEditingDepartmentIndex(null);
+                    } else {
+                        const errorData = await response.json().catch(() => ({}));
+                        throw new Error(errorData.detail || `Erro ao remover departamento: Status ${response.status}`);
+                    }
+                } catch (error) {
+                    setDepartmentsError(error.message || 'Falha ao remover departamento.');
+                }
+            }
+        );
+    };
+
+    // --- Sports URLs Handlers ---
     const handleSaveSportsUrl = async (index) => {
         setSavingSportsUrlIndex(index);
         setSportsUrlsError('');
@@ -337,33 +441,39 @@ export default function ClientConfigurations({ apiBaseUrl, token }) {
         setOriginalUrlToEdit('');
     };
 
-    const handleRemoveSportsUrl = async (indexToRemove) => {
+    const handleRemoveSportsUrl = (indexToRemove) => {
         const urlToRemove = sportsUrls[indexToRemove];
-        setSportsUrlsError('');
-        try {
-            const url = `${apiBaseUrl}/sports-urls`;
-            const response = await fetch(url, {
-                method: 'DELETE',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ url: urlToRemove })
-            });
+        onAction(
+            `Você tem certeza que quer remover esta URL de esporte?`,
+            async () => {
+                setSportsUrlsError('');
+                try {
+                    const url = `${apiBaseUrl}/sports-urls`;
+                    const response = await fetch(url, {
+                        method: 'DELETE',
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ url: urlToRemove })
+                    });
 
-            if (response.ok) {
-                const updatedUrls = sportsUrls.filter((_, index) => index !== indexToRemove);
-                setSportsUrls(updatedUrls);
-                setEditingSportsUrlIndex(null);
-            } else {
-                const errorData = await response.json().catch(() => ({}));
-                throw new Error(errorData.detail || `Erro ao remover URL de esportes: Status ${response.status}`);
+                    if (response.ok) {
+                        const updatedUrls = sportsUrls.filter((_, index) => index !== indexToRemove);
+                        setSportsUrls(updatedUrls);
+                        setEditingSportsUrlIndex(null);
+                    } else {
+                        const errorData = await response.json().catch(() => ({}));
+                        throw new Error(errorData.detail || `Erro ao remover URL de esportes: Status ${response.status}`);
+                    }
+                } catch (error) {
+                    setSportsUrlsError(error.message || 'Falha ao remover URL de esportes.');
+                }
             }
-        } catch (error) {
-            setSportsUrlsError(error.message || 'Falha ao remover URL de esportes.');
-        }
+        );
     };
 
+    // --- Generic Settings Handlers ---
     const handleSaveGoogleDriverId = async () => {
         setSavingGoogleDriverId(true);
         setGoogleDriverIdError('');
@@ -424,9 +534,13 @@ export default function ClientConfigurations({ apiBaseUrl, token }) {
         }
     };
 
+    // ==========================================
+    // RENDER
+    // ==========================================
+
     return (
-        <div className="flex-grow flex items-center justify-center bg-gray-50">
-            <div className="w-full max-w-4xl p-8 bg-white rounded-lg shadow-md">
+        <div className="flex-grow flex items-center justify-center bg-gray-50 overflow-y-auto">
+            <div className="w-full max-w-4xl p-8 bg-white rounded-lg shadow-md my-8">
                 <h2 className="text-2xl font-bold text-gray-700 mb-6">Configurações de Cliente</h2>
 
                 <div className="border-b border-gray-200 mb-4 overflow-x-auto">
@@ -442,14 +556,14 @@ export default function ClientConfigurations({ apiBaseUrl, token }) {
                             Cliente info e prompt
                         </button>
                         <button
-                            onClick={() => setActiveTab('newsUrl')}
+                            onClick={() => setActiveTab('departmentsAndNews')}
                             className={`${
-                                activeTab === 'newsUrl'
+                                activeTab === 'departmentsAndNews'
                                     ? 'border-blue-500 text-blue-600'
                                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                             } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
                         >
-                            URL de notícias
+                            Departamentos e Notícias
                         </button>
                         <button
                             onClick={() => setActiveTab('sportsUrls')}
@@ -476,6 +590,7 @@ export default function ClientConfigurations({ apiBaseUrl, token }) {
                     </nav>
                 </div>
 
+                {/* --- TAB: INFO E PROMPT --- */}
                 {activeTab === 'clientInfoAndPrompt' && (
                     <div>
                         <div className="flex justify-between items-center mb-4">
@@ -506,7 +621,6 @@ export default function ClientConfigurations({ apiBaseUrl, token }) {
                         {clientPromptError && <p className="text-red-500">{clientPromptError}</p>}
                         {!loadingClientPrompt && (
                             <div className="space-y-6">
-                                {/* Informações do Cliente */}
                                 <div className="space-y-4">
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-1">Nome do Cliente</label>
@@ -532,7 +646,6 @@ export default function ClientConfigurations({ apiBaseUrl, token }) {
                                     </div>
                                 </div>
 
-                                {/* Prompt do Sistema */}
                                 <div>
                                     <h4 className="text-lg font-semibold text-gray-700 mb-2">Prompt do Sistema</h4>
                                     <textarea
@@ -548,47 +661,111 @@ export default function ClientConfigurations({ apiBaseUrl, token }) {
                     </div>
                 )}
 
-                {activeTab === 'newsUrl' && (
-                    <div>
-                        <div className="flex justify-between items-center mb-4">
-                            <h3 className="text-xl font-semibold text-gray-700">URL de Notícias</h3>
-                            {!loadingNewsUrl && (
-                                <div>
-                                    {!isEditingNewsUrl ? (
-                                        <button
-                                            onClick={() => setIsEditingNewsUrl(true)}
-                                            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 focus:outline-none"
-                                        >
-                                            Editar
-                                        </button>
-                                    ) : (
-                                        <button
-                                            onClick={handleSaveNewsUrl}
-                                            disabled={savingNewsUrl}
-                                            className={`px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 focus:outline-none ${savingNewsUrl ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                        >
-                                            {savingNewsUrl ? 'Salvando...' : 'Salvar'}
-                                        </button>
+                {/* --- TAB: DEPARTAMENTOS E NOTÍCIAS --- */}
+                {activeTab === 'departmentsAndNews' && (
+                    <div className="space-y-8">
+                        {/* Seção Departamentos */}
+                        <div>
+                            <div className="flex justify-between items-center mb-4">
+                                <h3 className="text-xl font-semibold text-gray-700">Departamentos</h3>
+                                <button
+                                    onClick={handleAddDepartment}
+                                    className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 focus:outline-none"
+                                >
+                                    Adicionar Departamento
+                                </button>
+                            </div>
+
+                            {loadingDepartments && <p className="text-blue-500">Carregando Departamentos...</p>}
+                            {departmentsError && <p className="text-red-500">{departmentsError}</p>}
+                            {!loadingDepartments && (
+                                <div className="space-y-4 max-h-64 overflow-y-auto pr-2">
+                                    {departments.length === 0 && !editingDepartmentIndex && (
+                                        <p className="text-gray-500">Nenhum departamento encontrado.</p>
                                     )}
+                                    {departments.map((dep, index) => (
+                                        <div key={index} className="flex items-center space-x-2">
+                                            <input
+                                                type="text"
+                                                value={dep}
+                                                onChange={(e) => handleDepartmentChange(index, e.target.value)}
+                                                readOnly={editingDepartmentIndex !== index}
+                                                className={`flex-grow p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 ${editingDepartmentIndex !== index ? 'bg-gray-100' : ''}`}
+                                                placeholder="Adicione o nome do departamento"
+                                            />
+                                            {editingDepartmentIndex === index ? (
+                                                <button
+                                                    onClick={() => handleSaveDepartment(index)}
+                                                    disabled={savingDepartmentIndex === index}
+                                                    className={`px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 focus:outline-none ${savingDepartmentIndex === index ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                                >
+                                                    {savingDepartmentIndex === index ? 'Salvando...' : 'Salvar'}
+                                                </button>
+                                            ) : (
+                                                <button
+                                                    onClick={() => {setEditingDepartmentIndex(index); setOriginalDepartmentToEdit(dep);}}
+                                                    className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 focus:outline-none"
+                                                >
+                                                    Editar
+                                                </button>
+                                            )}
+                                            <button
+                                                onClick={() => handleRemoveDepartment(index)}
+                                                className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 focus:outline-none"
+                                            >
+                                                Remover
+                                            </button>
+                                        </div>
+                                    ))}
                                 </div>
                             )}
                         </div>
 
-                        {loadingNewsUrl && <p className="text-blue-500">Carregando URL...</p>}
-                        {newsUrlError && <p className="text-red-500">{newsUrlError}</p>}
-                        {!loadingNewsUrl && (
-                            <input
-                                type="text"
-                                value={newsUrl}
-                                onChange={(e) => setNewsUrl(e.target.value)}
-                                readOnly={!isEditingNewsUrl}
-                                className={`w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 ${!isEditingNewsUrl ? 'bg-gray-100' : ''}`}
-                                placeholder="Nenhuma URL de notícias encontrada."
-                            />
-                        )}
+                        <hr className="border-gray-200" />
+
+                        {/* Seção URL de Notícias */}
+                        <div>
+                            <div className="flex justify-between items-center mb-4">
+                                <h3 className="text-xl font-semibold text-gray-700">URL de Notícias</h3>
+                                {!loadingNewsUrl && (
+                                    <div>
+                                        {!isEditingNewsUrl ? (
+                                            <button
+                                                onClick={() => setIsEditingNewsUrl(true)}
+                                                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 focus:outline-none"
+                                            >
+                                                Editar
+                                            </button>
+                                        ) : (
+                                            <button
+                                                onClick={handleSaveNewsUrl}
+                                                disabled={savingNewsUrl}
+                                                className={`px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 focus:outline-none ${savingNewsUrl ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                            >
+                                                {savingNewsUrl ? 'Salvando...' : 'Salvar'}
+                                            </button>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+
+                            {loadingNewsUrl && <p className="text-blue-500">Carregando URL...</p>}
+                            {newsUrlError && <p className="text-red-500">{newsUrlError}</p>}
+                            {!loadingNewsUrl && (
+                                <input
+                                    type="text"
+                                    value={newsUrl}
+                                    onChange={(e) => setNewsUrl(e.target.value)}
+                                    readOnly={!isEditingNewsUrl}
+                                    className={`w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 ${!isEditingNewsUrl ? 'bg-gray-100' : ''}`}
+                                    placeholder="Nenhuma URL de notícias encontrada."
+                                />
+                            )}
+                        </div>
                     </div>
                 )}
 
+                {/* --- TAB: SPORTS URLs --- */}
                 {activeTab === 'sportsUrls' && (
                     <div>
                         <div className="flex justify-between items-center mb-4">
@@ -647,6 +824,7 @@ export default function ClientConfigurations({ apiBaseUrl, token }) {
                     </div>
                 )}
 
+                {/* --- TAB: GOOGLE DRIVER ID --- */}
                 {activeTab === 'googleDriverId' && (
                     <div>
                         <div className="flex justify-between items-center mb-4">
@@ -678,6 +856,7 @@ export default function ClientConfigurations({ apiBaseUrl, token }) {
                     </div>
                 )}
 
+                {/* --- TAB: SECRETS --- */}
                 {activeTab === 'secrets' && (
                     <div className="space-y-6">
                         <div className="flex justify-between items-center">
