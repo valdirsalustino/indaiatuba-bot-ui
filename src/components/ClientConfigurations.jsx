@@ -1,18 +1,26 @@
+// src/components/ClientConfigurations.jsx
 import React, { useState, useEffect } from 'react';
 
 export default function ClientConfigurations({ apiBaseUrl, token, onAction }) {
-    const [activeTab, setActiveTab] = useState('clientInfoAndPrompt');
+    const [activeTab, setActiveTab] = useState('systemPrompt');
 
     // --- Client Info & Prompt States ---
     const [clientName, setClientName] = useState('');
-    const [website, setWebsite] = useState('');
     const [systemPrompt, setSystemPrompt] = useState('');
     const [loadingClientPrompt, setLoadingClientPrompt] = useState(false);
     const [clientPromptError, setClientPromptError] = useState('');
     const [isEditingClientPrompt, setIsEditingClientPrompt] = useState(false);
     const [savingClientPrompt, setSavingClientPrompt] = useState(false);
+
+    // Original states to detect changes
     const [originalClientInfo, setOriginalClientInfo] = useState({ name: '', website: '' });
     const [originalSystemPrompt, setOriginalSystemPrompt] = useState('');
+
+    // --- Website States ---
+    const [website, setWebsite] = useState('');
+    const [isEditingWebsite, setIsEditingWebsite] = useState(false);
+    const [savingWebsite, setSavingWebsite] = useState(false);
+    const [websiteError, setWebsiteError] = useState('');
 
     // --- News URL States ---
     const [newsUrl, setNewsUrl] = useState('');
@@ -58,8 +66,8 @@ export default function ClientConfigurations({ apiBaseUrl, token, onAction }) {
     const [savingSecrets, setSavingSecrets] = useState(false);
 
     useEffect(() => {
-        // --- FETCH COMBINADO: Cliente Info e Prompt ---
-        if (activeTab === 'clientInfoAndPrompt' && apiBaseUrl && token) {
+        // --- FETCH: Nome do Cliente e Prompt ---
+        if (activeTab === 'systemPrompt' && apiBaseUrl && token) {
             const fetchClientPromptData = async () => {
                 setLoadingClientPrompt(true);
                 setClientPromptError('');
@@ -113,28 +121,13 @@ export default function ClientConfigurations({ apiBaseUrl, token, onAction }) {
             };
             fetchClientPromptData();
         }
-        // --- FETCH COMBINADO: Departamentos e URL de Notícias ---
-        else if (activeTab === 'departmentsAndNews' && apiBaseUrl && token) {
-            const fetchNewsAndDepartments = async () => {
-                setLoadingNewsUrl(true);
-                setNewsUrlError('');
+        // --- FETCH: Departamentos ---
+        else if (activeTab === 'departments' && apiBaseUrl && token) {
+            const fetchDepartments = async () => {
                 setLoadingDepartments(true);
                 setDepartmentsError('');
 
                 try {
-                    // Fetch News URL
-                    const newsResponse = await fetch(`${apiBaseUrl}/news-url`, {
-                        method: 'GET',
-                        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
-                    });
-                    if (newsResponse.ok) {
-                        const newsData = await newsResponse.json();
-                        setNewsUrl(newsData.url || '');
-                    } else if (newsResponse.status !== 404) {
-                        setNewsUrl('');
-                    }
-
-                    // Fetch Departments
                     const depResponse = await fetch(`${apiBaseUrl}/departments`, {
                         method: 'GET',
                         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
@@ -146,46 +139,78 @@ export default function ClientConfigurations({ apiBaseUrl, token, onAction }) {
                         setDepartments([]);
                     }
                 } catch (error) {
-                    setNewsUrlError(error.message || 'Falha ao conectar com o servidor.');
-                    setDepartmentsError('Falha ao conectar com o servidor para carregar departamentos.');
+                    setDepartmentsError(error.message || 'Falha ao conectar com o servidor para carregar departamentos.');
                 } finally {
-                    setLoadingNewsUrl(false);
                     setLoadingDepartments(false);
                 }
             };
-            fetchNewsAndDepartments();
+            fetchDepartments();
         }
-        // --- FETCH: Sports URLs ---
-        else if (activeTab === 'sportsUrls' && apiBaseUrl && token) {
-            const fetchSportsUrls = async () => {
+        // --- FETCH COMBINADO: Links para sites (Website, News, Sports) ---
+        else if (activeTab === 'siteLinks' && apiBaseUrl && token) {
+            const fetchSiteLinks = async () => {
+                setLoadingClientPrompt(true);
+                setLoadingNewsUrl(true);
                 setLoadingSportsUrls(true);
-                setSportsUrlsError('');
-                try {
-                    const url = `${apiBaseUrl}/sports-urls`;
-                    const response = await fetch(url, {
-                        method: 'GET',
-                        headers: {
-                            'Authorization': `Bearer ${token}`,
-                            'Content-Type': 'application/json'
-                        }
-                    });
 
-                    if (response.ok) {
-                        const data = await response.json();
+                setWebsiteError('');
+                setNewsUrlError('');
+                setSportsUrlsError('');
+
+                try {
+                    const infoResponse = await fetch(`${apiBaseUrl}/client-info`, {
+                        method: 'GET',
+                        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
+                    });
+                    if (infoResponse.ok) {
+                        const infoData = await infoResponse.json();
+                        setClientName(infoData.client_name || '');
+                        setWebsite(infoData.website || '');
+                        setOriginalClientInfo({ name: infoData.client_name || '', website: infoData.website || '' });
+                    } else if (infoResponse.status !== 404) {
+                        setWebsite('');
+                    }
+                } catch (error) {
+                    setWebsiteError(error.message || 'Falha ao conectar.');
+                } finally {
+                    setLoadingClientPrompt(false);
+                }
+
+                try {
+                    const newsResponse = await fetch(`${apiBaseUrl}/news-url`, {
+                        method: 'GET',
+                        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
+                    });
+                    if (newsResponse.ok) {
+                        const newsData = await newsResponse.json();
+                        setNewsUrl(newsData.url || '');
+                    } else if (newsResponse.status !== 404) {
+                        setNewsUrl('');
+                    }
+                } catch (error) {
+                    setNewsUrlError(error.message || 'Falha ao conectar.');
+                } finally {
+                    setLoadingNewsUrl(false);
+                }
+
+                try {
+                    const sportsResponse = await fetch(`${apiBaseUrl}/sports-urls`, {
+                        method: 'GET',
+                        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
+                    });
+                    if (sportsResponse.ok) {
+                        const data = await sportsResponse.json();
                         setSportsUrls(Array.isArray(data) ? data : []);
-                    } else if (response.status !== 404) {
-                        const errorData = await response.json().catch(() => ({}));
-                        throw new Error(errorData.detail || `Erro ao carregar URLs de esportes: Status ${response.status}`);
-                    } else {
+                    } else if (sportsResponse.status !== 404) {
                         setSportsUrls([]);
                     }
                 } catch (error) {
-                    setSportsUrlsError(error.message || 'Falha ao conectar com o servidor.');
+                    setSportsUrlsError(error.message || 'Falha ao conectar.');
                 } finally {
                     setLoadingSportsUrls(false);
                 }
             };
-            fetchSportsUrls();
+            fetchSiteLinks();
         }
         // --- FETCH: Google Driver ID ---
         else if (activeTab === 'googleDriverId' && apiBaseUrl && token) {
@@ -251,7 +276,7 @@ export default function ClientConfigurations({ apiBaseUrl, token, onAction }) {
         setSavingClientPrompt(true);
         setClientPromptError('');
         try {
-            if (clientName !== originalClientInfo.name || website !== originalClientInfo.website) {
+            if (clientName !== originalClientInfo.name) {
                 const infoUrl = `${apiBaseUrl}/client-info`;
                 const infoResponse = await fetch(infoUrl, {
                     method: 'PUT',
@@ -261,7 +286,7 @@ export default function ClientConfigurations({ apiBaseUrl, token, onAction }) {
 
                 if (!infoResponse.ok) {
                     const errorData = await infoResponse.json().catch(() => ({}));
-                    throw new Error(errorData.detail || `Erro ao salvar Info do Cliente: Status ${infoResponse.status}`);
+                    throw new Error(errorData.detail || `Erro ao salvar Nome do Cliente: Status ${infoResponse.status}`);
                 }
                 setOriginalClientInfo({ name: clientName, website: website });
             }
@@ -286,6 +311,32 @@ export default function ClientConfigurations({ apiBaseUrl, token, onAction }) {
             setClientPromptError(error.message || 'Falha ao salvar dados.');
         } finally {
             setSavingClientPrompt(false);
+        }
+    };
+
+    const handleSaveWebsite = async () => {
+        setSavingWebsite(true);
+        setWebsiteError('');
+        try {
+            if (website !== originalClientInfo.website) {
+                const infoUrl = `${apiBaseUrl}/client-info`;
+                const infoResponse = await fetch(infoUrl, {
+                    method: 'PUT',
+                    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ client_name: clientName, website: website })
+                });
+
+                if (!infoResponse.ok) {
+                    const errorData = await infoResponse.json().catch(() => ({}));
+                    throw new Error(errorData.detail || `Erro ao salvar Website: Status ${infoResponse.status}`);
+                }
+                setOriginalClientInfo({ name: clientName, website: website });
+            }
+            setIsEditingWebsite(false);
+        } catch (error) {
+            setWebsiteError(error.message || 'Falha ao salvar website.');
+        } finally {
+            setSavingWebsite(false);
         }
     };
 
@@ -316,11 +367,9 @@ export default function ClientConfigurations({ apiBaseUrl, token, onAction }) {
         }
     };
 
-    // --- Department Handlers ---
     const handleSaveDepartment = async (index) => {
         const currentDepartment = departments[index];
 
-        // Isolate the actual save API call
         const executeSave = async () => {
             setSavingDepartmentIndex(index);
             setDepartmentsError('');
@@ -350,7 +399,6 @@ export default function ClientConfigurations({ apiBaseUrl, token, onAction }) {
             }
         };
 
-        // Trigger warning ONLY if it's an edit AND the name was actually changed
         if (originalDepartmentToEdit && originalDepartmentToEdit !== '' && originalDepartmentToEdit !== currentDepartment) {
             onAction(
                 `Atenção: alterar o nome deste departamento pode desvincular a Role (papel) dos usuários associados a ele. Revise a tela de Gerenciamento de Usuários após essa edição! Confirmar alteração?`,
@@ -403,7 +451,6 @@ export default function ClientConfigurations({ apiBaseUrl, token, onAction }) {
         );
     };
 
-    // --- Sports URLs Handlers ---
     const handleSaveSportsUrl = async (index) => {
         setSavingSportsUrlIndex(index);
         setSportsUrlsError('');
@@ -487,7 +534,6 @@ export default function ClientConfigurations({ apiBaseUrl, token, onAction }) {
         );
     };
 
-    // --- Generic Settings Handlers ---
     const handleSaveGoogleDriverId = async () => {
         setSavingGoogleDriverId(true);
         setGoogleDriverIdError('');
@@ -553,41 +599,44 @@ export default function ClientConfigurations({ apiBaseUrl, token, onAction }) {
     // ==========================================
 
     return (
-        <div className="flex-grow flex items-center justify-center bg-gray-50 overflow-y-auto">
-            <div className="w-full max-w-4xl p-8 bg-white rounded-lg shadow-md my-8">
+        // A principal alteração está nestas classes abaixo:
+        // Removido "items-center" que causava o corte da tela,
+        // e incluído p-6 para dar um respiro no fundo.
+        <div className="flex-grow overflow-y-auto bg-gray-50 p-6">
+            <div className="w-full max-w-4xl mx-auto p-8 bg-white rounded-lg shadow-md mb-12">
                 <h2 className="text-2xl font-bold text-gray-700 mb-6">Configurações de Cliente</h2>
 
-                <div className="border-b border-gray-200 mb-4 overflow-x-auto">
+                <div className="border-b border-gray-200 mb-6 overflow-x-auto">
                     <nav className="-mb-px flex space-x-8" aria-label="Tabs">
                         <button
-                            onClick={() => setActiveTab('clientInfoAndPrompt')}
+                            onClick={() => setActiveTab('systemPrompt')}
                             className={`${
-                                activeTab === 'clientInfoAndPrompt'
+                                activeTab === 'systemPrompt'
                                     ? 'border-blue-500 text-blue-600'
                                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                             } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
                         >
-                            Cliente info e prompt
+                            Prompt do Sistema
                         </button>
                         <button
-                            onClick={() => setActiveTab('departmentsAndNews')}
+                            onClick={() => setActiveTab('departments')}
                             className={`${
-                                activeTab === 'departmentsAndNews'
+                                activeTab === 'departments'
                                     ? 'border-blue-500 text-blue-600'
                                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                             } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
                         >
-                            Departamentos e Notícias
+                            Departamentos
                         </button>
                         <button
-                            onClick={() => setActiveTab('sportsUrls')}
+                            onClick={() => setActiveTab('siteLinks')}
                             className={`${
-                                activeTab === 'sportsUrls'
+                                activeTab === 'siteLinks'
                                     ? 'border-blue-500 text-blue-600'
                                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                             } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
                         >
-                            URL de esportes
+                            Links para sites
                         </button>
                         <button
                             onClick={() => setActiveTab('googleDriverId')}
@@ -604,11 +653,11 @@ export default function ClientConfigurations({ apiBaseUrl, token, onAction }) {
                     </nav>
                 </div>
 
-                {/* --- TAB: INFO E PROMPT --- */}
-                {activeTab === 'clientInfoAndPrompt' && (
+                {/* --- TAB: PROMPT DO SISTEMA --- */}
+                {activeTab === 'systemPrompt' && (
                     <div>
                         <div className="flex justify-between items-center mb-4">
-                            <h3 className="text-xl font-semibold text-gray-700">Informações e Prompt do Sistema</h3>
+                            <h3 className="text-xl font-semibold text-gray-700">Prompt do Sistema</h3>
                             {!loadingClientPrompt && (
                                 <div>
                                     {!isEditingClientPrompt ? (
@@ -635,33 +684,20 @@ export default function ClientConfigurations({ apiBaseUrl, token, onAction }) {
                         {clientPromptError && <p className="text-red-500">{clientPromptError}</p>}
                         {!loadingClientPrompt && (
                             <div className="space-y-6">
-                                <div className="space-y-4">
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">Nome do Cliente</label>
-                                        <input
-                                            type="text"
-                                            value={clientName}
-                                            onChange={(e) => setClientName(e.target.value)}
-                                            readOnly={!isEditingClientPrompt}
-                                            className={`w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 ${!isEditingClientPrompt ? 'bg-gray-100' : ''}`}
-                                            placeholder="Insira o nome do cliente"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">Website</label>
-                                        <input
-                                            type="text"
-                                            value={website}
-                                            onChange={(e) => setWebsite(e.target.value)}
-                                            readOnly={!isEditingClientPrompt}
-                                            className={`w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 ${!isEditingClientPrompt ? 'bg-gray-100' : ''}`}
-                                            placeholder="Insira o website"
-                                        />
-                                    </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Nome do Cliente</label>
+                                    <input
+                                        type="text"
+                                        value={clientName}
+                                        onChange={(e) => setClientName(e.target.value)}
+                                        readOnly={!isEditingClientPrompt}
+                                        className={`w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 ${!isEditingClientPrompt ? 'bg-gray-100' : ''}`}
+                                        placeholder="Insira o nome do cliente"
+                                    />
                                 </div>
 
                                 <div>
-                                    <h4 className="text-lg font-semibold text-gray-700 mb-2">Prompt do Sistema</h4>
+                                    <h4 className="text-lg font-semibold text-gray-700 mb-2">Prompt da Inteligência Artificial</h4>
                                     <textarea
                                         value={systemPrompt}
                                         onChange={(e) => setSystemPrompt(e.target.value)}
@@ -675,10 +711,9 @@ export default function ClientConfigurations({ apiBaseUrl, token, onAction }) {
                     </div>
                 )}
 
-                {/* --- TAB: DEPARTAMENTOS E NOTÍCIAS --- */}
-                {activeTab === 'departmentsAndNews' && (
+                {/* --- TAB: DEPARTAMENTOS --- */}
+                {activeTab === 'departments' && (
                     <div className="space-y-8">
-                        {/* Seção Departamentos */}
                         <div>
                             <div className="flex justify-between items-center mb-4">
                                 <h3 className="text-xl font-semibold text-gray-700">Departamentos</h3>
@@ -693,7 +728,8 @@ export default function ClientConfigurations({ apiBaseUrl, token, onAction }) {
                             {loadingDepartments && <p className="text-blue-500">Carregando Departamentos...</p>}
                             {departmentsError && <p className="text-red-500">{departmentsError}</p>}
                             {!loadingDepartments && (
-                                <div className="space-y-4 max-h-64 overflow-y-auto pr-2">
+                                // Removida a limitação de altura (max-h-96 overflow-y-auto)
+                                <div className="space-y-4">
                                     {departments.length === 0 && !editingDepartmentIndex && (
                                         <p className="text-gray-500">Nenhum departamento encontrado.</p>
                                     )}
@@ -732,6 +768,51 @@ export default function ClientConfigurations({ apiBaseUrl, token, onAction }) {
                                         </div>
                                     ))}
                                 </div>
+                            )}
+                        </div>
+                    </div>
+                )}
+
+                {/* --- TAB: LINKS PARA SITES --- */}
+                {activeTab === 'siteLinks' && (
+                    <div className="space-y-8">
+                        {/* Seção Website */}
+                        <div>
+                            <div className="flex justify-between items-center mb-4">
+                                <h3 className="text-xl font-semibold text-gray-700">Website Principal</h3>
+                                {!loadingClientPrompt && (
+                                    <div>
+                                        {!isEditingWebsite ? (
+                                            <button
+                                                onClick={() => setIsEditingWebsite(true)}
+                                                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 focus:outline-none"
+                                            >
+                                                Editar
+                                            </button>
+                                        ) : (
+                                            <button
+                                                onClick={handleSaveWebsite}
+                                                disabled={savingWebsite}
+                                                className={`px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 focus:outline-none ${savingWebsite ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                            >
+                                                {savingWebsite ? 'Salvando...' : 'Salvar'}
+                                            </button>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+
+                            {loadingClientPrompt && <p className="text-blue-500">Carregando website...</p>}
+                            {websiteError && <p className="text-red-500">{websiteError}</p>}
+                            {!loadingClientPrompt && (
+                                <input
+                                    type="text"
+                                    value={website}
+                                    onChange={(e) => setWebsite(e.target.value)}
+                                    readOnly={!isEditingWebsite}
+                                    className={`w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 ${!isEditingWebsite ? 'bg-gray-100' : ''}`}
+                                    placeholder="Insira o website"
+                                />
                             )}
                         </div>
 
@@ -776,65 +857,66 @@ export default function ClientConfigurations({ apiBaseUrl, token, onAction }) {
                                 />
                             )}
                         </div>
-                    </div>
-                )}
 
-                {/* --- TAB: SPORTS URLs --- */}
-                {activeTab === 'sportsUrls' && (
-                    <div>
-                        <div className="flex justify-between items-center mb-4">
-                            <h3 className="text-xl font-semibold text-gray-700">URLs de Esportes</h3>
-                            <button
-                                onClick={handleAddSportsUrl}
-                                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 focus:outline-none"
-                            >
-                                Adicionar URL
-                            </button>
-                        </div>
+                        <hr className="border-gray-200" />
 
-                        {loadingSportsUrls && <p className="text-blue-500">Carregando URLs...</p>}
-                        {sportsUrlsError && <p className="text-red-500">{sportsUrlsError}</p>}
-                        {!loadingSportsUrls && (
-                            <div className="space-y-4 max-h-96 overflow-y-auto pr-2">
-                                {sportsUrls.length === 0 && !editingSportsUrlIndex && (
-                                    <p className="text-gray-500">Nenhuma URL de esportes encontrada.</p>
-                                )}
-                                {sportsUrls.map((url, index) => (
-                                    <div key={index} className="flex items-center space-x-2">
-                                        <input
-                                            type="text"
-                                            value={url}
-                                            onChange={(e) => handleSportsUrlChange(index, e.target.value)}
-                                            readOnly={editingSportsUrlIndex !== index}
-                                            className={`flex-grow p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 ${editingSportsUrlIndex !== index ? 'bg-gray-100' : ''}`}
-                                            placeholder="Adicione uma URL de esportes"
-                                        />
-                                        {editingSportsUrlIndex === index ? (
-                                            <button
-                                                onClick={() => handleSaveSportsUrl(index)}
-                                                disabled={savingSportsUrlIndex === index}
-                                                className={`px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 focus:outline-none ${savingSportsUrlIndex === index ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                            >
-                                                {savingSportsUrlIndex === index ? 'Salvando...' : 'Salvar'}
-                                            </button>
-                                        ) : (
-                                            <button
-                                                onClick={() => {setEditingSportsUrlIndex(index); setOriginalUrlToEdit(url);}}
-                                                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 focus:outline-none"
-                                            >
-                                                Editar
-                                            </button>
-                                        )}
-                                        <button
-                                            onClick={() => handleRemoveSportsUrl(index)}
-                                            className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 focus:outline-none"
-                                        >
-                                            Remover
-                                        </button>
-                                    </div>
-                                ))}
+                        {/* Seção URLs de Esportes */}
+                        <div>
+                            <div className="flex justify-between items-center mb-4">
+                                <h3 className="text-xl font-semibold text-gray-700">URLs de Esportes</h3>
+                                <button
+                                    onClick={handleAddSportsUrl}
+                                    className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 focus:outline-none"
+                                >
+                                    Adicionar URL
+                                </button>
                             </div>
-                        )}
+
+                            {loadingSportsUrls && <p className="text-blue-500">Carregando URLs...</p>}
+                            {sportsUrlsError && <p className="text-red-500">{sportsUrlsError}</p>}
+                            {!loadingSportsUrls && (
+                                // Removida a limitação de altura (max-h-96 overflow-y-auto)
+                                <div className="space-y-4">
+                                    {sportsUrls.length === 0 && !editingSportsUrlIndex && (
+                                        <p className="text-gray-500">Nenhuma URL de esportes encontrada.</p>
+                                    )}
+                                    {sportsUrls.map((url, index) => (
+                                        <div key={index} className="flex items-center space-x-2">
+                                            <input
+                                                type="text"
+                                                value={url}
+                                                onChange={(e) => handleSportsUrlChange(index, e.target.value)}
+                                                readOnly={editingSportsUrlIndex !== index}
+                                                className={`flex-grow p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 ${editingSportsUrlIndex !== index ? 'bg-gray-100' : ''}`}
+                                                placeholder="Adicione uma URL de esportes"
+                                            />
+                                            {editingSportsUrlIndex === index ? (
+                                                <button
+                                                    onClick={() => handleSaveSportsUrl(index)}
+                                                    disabled={savingSportsUrlIndex === index}
+                                                    className={`px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 focus:outline-none ${savingSportsUrlIndex === index ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                                >
+                                                    {savingSportsUrlIndex === index ? 'Salvando...' : 'Salvar'}
+                                                </button>
+                                            ) : (
+                                                <button
+                                                    onClick={() => {setEditingSportsUrlIndex(index); setOriginalUrlToEdit(url);}}
+                                                    className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 focus:outline-none"
+                                                >
+                                                    Editar
+                                                </button>
+                                            )}
+                                            <button
+                                                onClick={() => handleRemoveSportsUrl(index)}
+                                                className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 focus:outline-none"
+                                            >
+                                                Remover
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
                     </div>
                 )}
 
