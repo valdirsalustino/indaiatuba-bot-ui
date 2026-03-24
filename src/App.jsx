@@ -64,7 +64,6 @@ function App() {
   const [selectedConversation, setSelectedConversation] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [anyNeedsAttention, setAnyNeedsAttention] = useState(false);
   const [activeView, setActiveView] = useState('conversations');
   const [departments, setDepartments] = useState([]);
 
@@ -174,10 +173,6 @@ function App() {
         }
         return newConversations;
       });
-
-      setAnyNeedsAttention(prev => prev || serverData.some(
-        conv => conv.status === 'open' && conv.human_supervision === true
-      ));
 
     } catch (err) {
       if (err.message !== 'Authentication failed') {
@@ -330,7 +325,10 @@ function App() {
                   ...targetConv,
                   messages: [...currentMessages, newMessage],
                   last_message: newMessage.text,
-                  last_updated: newMessage.timestamp
+                  last_updated: newMessage.timestamp,
+                  // FAILSFE: If backend sends status changes attached to the message
+                  ...(data.data.status !== undefined && { status: data.data.status }),
+                  ...(data.data.human_supervision !== undefined && { human_supervision: data.data.human_supervision })
               };
 
               const otherConvs = [
@@ -341,7 +339,8 @@ function App() {
               return [updatedConv, ...otherConvs];
             });
           }
-          else if (['new_handoff_request', 'conversation_resolved', 'supervision_type_changed', 'conversation_taken_over'].includes(data.update)) {
+          // ADDED 'conversation_closed' and 'status_changed' to catch bot closing events
+          else if (['new_handoff_request', 'conversation_resolved', 'supervision_type_changed', 'conversation_taken_over', 'conversation_closed', 'status_changed'].includes(data.update)) {
 
             if (data.update === 'new_handoff_request') {
               try {
@@ -483,6 +482,9 @@ function App() {
       ),
     });
   };
+
+  // DYNAMICALLY CALCULATE if any needs attention so it perfectly matches the real state
+  const anyNeedsAttention = conversations.some(conv => conv.status === 'open' && conv.human_supervision === true);
 
   if (isValidTenant === null) {
       return <div className="flex items-center justify-center h-screen bg-gray-200">Validando cliente...</div>;
