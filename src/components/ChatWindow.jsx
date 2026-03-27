@@ -216,8 +216,8 @@ export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved
 
             const isUserMessage = msg.sender === 'user';
             const isBotMessage = msg.sender === 'bot';
-            const justification = isUserMessage ? 'justify-end' : 'justify-start';
-            const nameAlignment = isUserMessage ? 'text-right mr-2' : 'text-left';
+            const justification = isUserMessage ? 'justify-start' : 'justify-end';
+            const nameAlignment = isUserMessage ? 'text-left self-start' : 'text-right self-end';
             let senderName = msg.sender === 'user'
                 ? (conversation.user_name || 'Cliente')
                 : msg.sender === 'bot' ? 'Indaiatuba IA' : msg.sender;
@@ -248,7 +248,7 @@ export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved
                 {dateDivider}
                 <div className={`flex ${justification}`}>
                     <div className="flex flex-col max-w-lg">
-                        {senderName && ( <span className={`text-xs text-gray-700 font-bold capitalize ${nameAlignment} ${bgColor} border border-gray-200 rounded-t-lg px-2 py-1 self-start`}>{senderName}</span> )}
+                        {senderName && ( <span className={`text-xs text-gray-700 font-bold capitalize ${nameAlignment} ${bgColor} border border-gray-200 rounded-t-lg px-2 py-1`}>{senderName}</span> )}
                         <div className={`rounded-xl px-4 py-2 shadow-md ${bgColor} text-gray-800 ${senderName ? 'rounded-t-none' : ''}`}>
                             <div className="flex flex-col">
                                 {msg.media_url && <MediaRenderer msg={msg} />}
