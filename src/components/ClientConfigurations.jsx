@@ -369,6 +369,7 @@ export default function ClientConfigurations({ apiBaseUrl, token, onAction }) {
 
     const handleSaveDepartment = async (index) => {
         const currentDepartment = departments[index];
+        const currentDeptName = typeof currentDepartment === 'object' ? currentDepartment.name : currentDepartment;
 
         const executeSave = async () => {
             setSavingDepartmentIndex(index);
@@ -399,7 +400,7 @@ export default function ClientConfigurations({ apiBaseUrl, token, onAction }) {
             }
         };
 
-        if (originalDepartmentToEdit && originalDepartmentToEdit !== '' && originalDepartmentToEdit !== currentDepartment.name) {
+        if (originalDepartmentToEdit && originalDepartmentToEdit !== '' && originalDepartmentToEdit !== currentDeptName) {
             onAction(
                 `Atenção: alterar o nome deste departamento pode desvincular a Role (papel) dos usuários associados a ele. Revise a tela de Gerenciamento de Usuários após essa edição! Confirmar alteração?`,
                 executeSave
@@ -445,9 +446,10 @@ export default function ClientConfigurations({ apiBaseUrl, token, onAction }) {
 
     const handleRemoveDepartment = (indexToRemove) => {
         const departmentToRemove = departments[indexToRemove];
+        const depToRemoveName = typeof departmentToRemove === 'object' ? departmentToRemove.name : departmentToRemove;
 
         onAction(
-            `Você tem certeza que quer remover o departamento "${departmentToRemove.name}"? Atenção: usuários vinculados a este departamento perderão sua associação. Revise a tela de Gerenciamento de Usuários após esta ação!`,
+            `Você tem certeza que quer remover o departamento "${depToRemoveName}"? Atenção: usuários vinculados a este departamento perderão sua associação. Revise a tela de Gerenciamento de Usuários após esta ação!`,
             async () => {
                 setDepartmentsError('');
                 try {
@@ -762,7 +764,7 @@ export default function ClientConfigurations({ apiBaseUrl, token, onAction }) {
                                                     <label className="block text-sm font-medium text-gray-700 mb-1">Nome do Departamento</label>
                                                     <input
                                                         type="text"
-                                                        value={dep.name || ''}
+                                                        value={typeof dep === 'object' ? dep.name : dep || ''}
                                                         onChange={(e) => handleDepartmentChange(index, 'name', e.target.value)}
                                                         readOnly={editingDepartmentIndex !== index}
                                                         className={`w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 ${editingDepartmentIndex !== index ? 'bg-gray-100' : ''}`}
@@ -780,7 +782,7 @@ export default function ClientConfigurations({ apiBaseUrl, token, onAction }) {
                                                         </button>
                                                     ) : (
                                                         <button
-                                                            onClick={() => {setEditingDepartmentIndex(index); setOriginalDepartmentToEdit(dep.name);}}
+                                                            onClick={() => {setEditingDepartmentIndex(index); setOriginalDepartmentToEdit(typeof dep === 'object' ? dep.name : dep);}}
                                                             className="px-4 py-3 bg-blue-600 text-white rounded hover:bg-blue-700 focus:outline-none"
                                                         >
                                                             Editar

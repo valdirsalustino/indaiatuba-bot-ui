@@ -163,7 +163,8 @@ export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved
 
   const needsAttention = conversation.status === 'open' && conversation.human_supervision;
   let lastMessageDate = null;
-  const availableTypes = departments.filter( (type) => type !== conversation.human_supervision_type );
+  const safeDepartments = departments.map(dep => typeof dep === 'object' ? dep.name : dep);
+  const availableTypes = safeDepartments.filter( (type) => type !== conversation.human_supervision_type );
   const isInputDisabled = conversation.status !== 'open' || !conversation.human_supervision;
 
   return (
