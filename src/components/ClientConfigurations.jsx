@@ -399,7 +399,7 @@ export default function ClientConfigurations({ apiBaseUrl, token, onAction }) {
             }
         };
 
-        if (originalDepartmentToEdit && originalDepartmentToEdit !== '' && originalDepartmentToEdit !== currentDepartment) {
+        if (originalDepartmentToEdit && originalDepartmentToEdit !== '' && originalDepartmentToEdit !== currentDepartment.name) {
             onAction(
                 `Atenção: alterar o nome deste departamento pode desvincular a Role (papel) dos usuários associados a ele. Revise a tela de Gerenciamento de Usuários após essa edição! Confirmar alteração?`,
                 executeSave
@@ -409,14 +409,36 @@ export default function ClientConfigurations({ apiBaseUrl, token, onAction }) {
         }
     };
 
-    const handleDepartmentChange = (index, value) => {
+    const handleDepartmentChange = (index, field, value) => {
         const newDepartments = [...departments];
-        newDepartments[index] = value;
+        newDepartments[index] = { ...newDepartments[index], [field]: value };
+        setDepartments(newDepartments);
+    };
+
+    const handleScheduleChange = (depIndex, dayIndex, field, value) => {
+        const newDepartments = [...departments];
+        const department = newDepartments[depIndex];
+        const updatedSchedule = { 
+            ...department.schedule, 
+            [dayIndex]: { 
+                ...(department.schedule ? department.schedule[dayIndex] : { active: false, start_time: '08:00', end_time: '18:00' }), 
+                [field]: value 
+            } 
+        };
+        newDepartments[depIndex] = { ...department, schedule: updatedSchedule };
         setDepartments(newDepartments);
     };
 
     const handleAddDepartment = () => {
-        setDepartments([...departments, '']);
+        const defaultSchedule = {};
+        for (let i = 0; i < 7; i++) {
+            defaultSchedule[i.toString()] = {
+                active: i < 5,
+                start_time: '08:00',
+                end_time: '18:00'
+            };
+        }
+        setDepartments([...departments, { name: '', schedule: defaultSchedule, timezone: 'America/Sao_Paulo' }]);
         setEditingDepartmentIndex(departments.length);
         setOriginalDepartmentToEdit('');
     };
@@ -425,7 +447,7 @@ export default function ClientConfigurations({ apiBaseUrl, token, onAction }) {
         const departmentToRemove = departments[indexToRemove];
 
         onAction(
-            `Você tem certeza que quer remover o departamento "${departmentToRemove}"? Atenção: usuários vinculados a este departamento perderão sua associação. Revise a tela de Gerenciamento de Usuários após esta ação!`,
+            `Você tem certeza que quer remover o departamento "${departmentToRemove.name}"? Atenção: usuários vinculados a este departamento perderão sua associação. Revise a tela de Gerenciamento de Usuários após esta ação!`,
             async () => {
                 setDepartmentsError('');
                 try {
@@ -734,37 +756,108 @@ export default function ClientConfigurations({ apiBaseUrl, token, onAction }) {
                                         <p className="text-gray-500">Nenhum departamento encontrado.</p>
                                     )}
                                     {departments.map((dep, index) => (
-                                        <div key={index} className="flex items-center space-x-2">
-                                            <input
-                                                type="text"
-                                                value={dep}
-                                                onChange={(e) => handleDepartmentChange(index, e.target.value)}
-                                                readOnly={editingDepartmentIndex !== index}
-                                                className={`flex-grow p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 ${editingDepartmentIndex !== index ? 'bg-gray-100' : ''}`}
-                                                placeholder="Adicione o nome do departamento"
-                                            />
-                                            {editingDepartmentIndex === index ? (
-                                                <button
-                                                    onClick={() => handleSaveDepartment(index)}
-                                                    disabled={savingDepartmentIndex === index}
-                                                    className={`px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 focus:outline-none ${savingDepartmentIndex === index ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                                >
-                                                    {savingDepartmentIndex === index ? 'Salvando...' : 'Salvar'}
-                                                </button>
-                                            ) : (
-                                                <button
-                                                    onClick={() => {setEditingDepartmentIndex(index); setOriginalDepartmentToEdit(dep);}}
-                                                    className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 focus:outline-none"
-                                                >
-                                                    Editar
-                                                </button>
-                                            )}
-                                            <button
-                                                onClick={() => handleRemoveDepartment(index)}
-                                                className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 focus:outline-none"
-                                            >
-                                                Remover
-                                            </button>
+                                        <div key={index} className="flex flex-col bg-white border border-gray-200 rounded-lg shadow-sm p-4 space-y-4">
+                                            <div className="flex items-center space-x-2">
+                                                <div className="flex-grow">
+                                                    <label className="block text-sm font-medium text-gray-700 mb-1">Nome do Departamento</label>
+                                                    <input
+                                                        type="text"
+                                                        value={dep.name || ''}
+                                                        onChange={(e) => handleDepartmentChange(index, 'name', e.target.value)}
+                                                        readOnly={editingDepartmentIndex !== index}
+                                                        className={`w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 ${editingDepartmentIndex !== index ? 'bg-gray-100' : ''}`}
+                                                        placeholder="Adicione o nome do departamento"
+                                                    />
+                                                </div>
+                                                <div className="flex space-x-2 self-end mb-1">
+                                                    {editingDepartmentIndex === index ? (
+                                                        <button
+                                                            onClick={() => handleSaveDepartment(index)}
+                                                            disabled={savingDepartmentIndex === index}
+                                                            className={`px-4 py-3 bg-green-600 text-white rounded hover:bg-green-700 focus:outline-none ${savingDepartmentIndex === index ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                                        >
+                                                            {savingDepartmentIndex === index ? 'Salvando...' : 'Salvar'}
+                                                        </button>
+                                                    ) : (
+                                                        <button
+                                                            onClick={() => {setEditingDepartmentIndex(index); setOriginalDepartmentToEdit(dep.name);}}
+                                                            className="px-4 py-3 bg-blue-600 text-white rounded hover:bg-blue-700 focus:outline-none"
+                                                        >
+                                                            Editar
+                                                        </button>
+                                                    )}
+                                                    <button
+                                                        onClick={() => handleRemoveDepartment(index)}
+                                                        className="px-4 py-3 bg-red-600 text-white rounded hover:bg-red-700 focus:outline-none"
+                                                    >
+                                                        Remover
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            <div className="grid grid-cols-1 gap-4">
+                                                <div>
+                                                    <label className="block text-sm font-medium text-gray-700 mb-2">Dias e Horários de Funcionamento</label>
+                                                    <div className="flex flex-col gap-2">
+                                                        {[
+                                                            { label: 'Segunda', val: 0 },
+                                                            { label: 'Terça', val: 1 },
+                                                            { label: 'Quarta', val: 2 },
+                                                            { label: 'Quinta', val: 3 },
+                                                            { label: 'Sexta', val: 4 },
+                                                            { label: 'Sábado', val: 5 },
+                                                            { label: 'Domingo', val: 6 }
+                                                        ].map(day => {
+                                                            const dayData = (dep.schedule && dep.schedule[day.val.toString()]) || { active: false, start_time: '08:00', end_time: '18:00' };
+                                                            const isEditing = editingDepartmentIndex === index;
+                                                            return (
+                                                                <div key={day.val} className={`p-3 rounded border flex flex-col md:flex-row md:items-center gap-4 transition-colors ${dayData.active ? 'border-blue-300 bg-blue-50/30' : 'border-gray-200 bg-gray-50/50'}`}>
+                                                                    <label className="flex items-center w-36 font-medium text-gray-700 cursor-pointer">
+                                                                        <input
+                                                                            type="checkbox"
+                                                                            checked={dayData.active}
+                                                                            onChange={(e) => handleScheduleChange(index, day.val.toString(), 'active', e.target.checked)}
+                                                                            className="w-4 h-4 mr-3 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                                                            disabled={!isEditing}
+                                                                        />
+                                                                        {day.label}
+                                                                    </label>
+                                                                    
+                                                                    <div className={`flex items-center space-x-2 transition-opacity ${dayData.active ? 'opacity-100' : 'opacity-50 pointer-events-none'}`}>
+                                                                        <input
+                                                                            type="time"
+                                                                            value={dayData.start_time}
+                                                                            onChange={(e) => handleScheduleChange(index, day.val.toString(), 'start_time', e.target.value)}
+                                                                            readOnly={!isEditing}
+                                                                            className={`p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 ${!isEditing ? 'bg-gray-100' : 'bg-white'}`}
+                                                                        />
+                                                                        <span className="text-gray-500">até</span>
+                                                                        <input
+                                                                            type="time"
+                                                                            value={dayData.end_time}
+                                                                            onChange={(e) => handleScheduleChange(index, day.val.toString(), 'end_time', e.target.value)}
+                                                                            readOnly={!isEditing}
+                                                                            className={`p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 ${!isEditing ? 'bg-gray-100' : 'bg-white'}`}
+                                                                        />
+                                                                    </div>
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </div>
+
+                                                <div>
+                                                    <label className="block text-sm font-medium text-gray-700 mb-1">Fuso Horário</label>
+                                                    <input
+                                                        type="text"
+                                                        value={dep.timezone || ''}
+                                                        onChange={(e) => handleDepartmentChange(index, 'timezone', e.target.value)}
+                                                        readOnly={editingDepartmentIndex !== index}
+                                                        className={`w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 ${editingDepartmentIndex !== index ? 'bg-gray-100' : ''}`}
+                                                        placeholder="America/Sao_Paulo"
+                                                    />
+                                                </div>
+                                            </div>
                                         </div>
                                     ))}
                                 </div>

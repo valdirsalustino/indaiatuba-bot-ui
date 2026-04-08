@@ -180,9 +180,10 @@ export default function UserManagement({ token, apiBaseUrl, onAction, currentUse
                                         }
                                     }}
                                 >
-                                    {departments.map(dep => (
-                                        <option key={dep} value={dep}>{dep}</option>
-                                    ))}
+                                    {departments.map(dep => {
+                                        const depName = typeof dep === 'object' ? dep.name : dep;
+                                        return <option key={depName} value={depName}>{depName}</option>;
+                                    })}
                                     <option value="Admin">Admin</option>
                                 </select>
                               </td>
@@ -223,9 +224,10 @@ export default function UserManagement({ token, apiBaseUrl, onAction, currentUse
                                       className="w-full p-1.5 border rounded-md"
                                   >
                                      <option value="" disabled>Selecione um papel</option>
-                                      {departments.map(dep => (
-                                          <option key={dep} value={dep}>{dep}</option>
-                                      ))}
+                                      {departments.map(dep => {
+                                          const depName = typeof dep === 'object' ? dep.name : dep;
+                                          return <option key={depName} value={depName}>{depName}</option>;
+                                      })}
                                       <option value="Admin">Admin</option>
                                   </select>
                               </td>
