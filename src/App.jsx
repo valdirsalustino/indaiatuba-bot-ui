@@ -484,8 +484,26 @@ function App() {
     });
   };
 
+  const handleReopenThread = (compositeId) => {
+    setModalState({
+      isOpen: true,
+      message: 'Tem certeza que deseja reabrir esta conversa para enviar uma mensagem ao cliente?',
+      onConfirm: () => handleApiCall(
+        `${apiBaseUrl}/conversations/${compositeId}/reopen`,
+        { method: 'POST' }
+      ),
+    });
+  };
+
   // DYNAMICALLY CALCULATE if any needs attention so it perfectly matches the real state
   const anyNeedsAttention = conversations.some(conv => conv.status === 'open' && conv.human_supervision === true);
+
+  const isLatestThread = React.useMemo(() => {
+    if (!selectedConversation) return false;
+    const allConvsForPhone = conversations.filter(c => c.phone_number === selectedConversation.phone_number);
+    allConvsForPhone.sort((a, b) => new Date(b.last_updated) - new Date(a.last_updated));
+    return allConvsForPhone.length > 0 && allConvsForPhone[0].composite_id === selectedConversation.composite_id;
+  }, [conversations, selectedConversation]);
 
   if (isValidTenant === null) {
       return <div className="flex items-center justify-center h-screen bg-gray-200">Validando cliente...</div>;
@@ -542,8 +560,10 @@ function App() {
                 onMarkAsSolved={handleMarkAsSolved}
                 onInitiateTransfer={handleUpdateSupervisionType}
                 onTakeOver={handleTakeOverConversation}
+                onReopenThread={handleReopenThread}
                 currentUser={currentUser}
                 departments={departments}
+                isLatestThread={isLatestThread}
             />
         )}
 
