@@ -16,6 +16,13 @@ export default function ClientConfigurations({ apiBaseUrl, token, onAction }) {
     const [originalClientInfo, setOriginalClientInfo] = useState({ name: '', website: '' });
     const [originalSystemPrompt, setOriginalSystemPrompt] = useState('');
 
+    // --- Topics States ---
+    const [topics, setTopics] = useState([]);
+    const [topicsError, setTopicsError] = useState('');
+    const [editingTopicIndex, setEditingTopicIndex] = useState(null);
+    const [savingTopicIndex, setSavingTopicIndex] = useState(null);
+    const [originalTopicToEdit, setOriginalTopicToEdit] = useState(null);
+
     // --- Website States ---
     const [website, setWebsite] = useState('');
     const [isEditingWebsite, setIsEditingWebsite] = useState(false);
@@ -112,6 +119,25 @@ export default function ClientConfigurations({ apiBaseUrl, token, onAction }) {
                         throw new Error(errorData.detail || `Erro ao carregar prompt: Status ${promptResponse.status}`);
                     } else {
                         setSystemPrompt('');
+                    }
+
+                    const topicsUrl = `${apiBaseUrl}/topic-classification`;
+                    const topicsResponse = await fetch(topicsUrl, {
+                        method: 'GET',
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json'
+                        }
+                    });
+
+                    if (topicsResponse.ok) {
+                        const topicsData = await topicsResponse.json();
+                        setTopics(Array.isArray(topicsData) ? topicsData : []);
+                    } else if (topicsResponse.status !== 404) {
+                        const errorData = await topicsResponse.json().catch(() => ({}));
+                        throw new Error(errorData.detail || `Erro ao carregar tópicos: Status ${topicsResponse.status}`);
+                    } else {
+                        setTopics([]);
                     }
                 } catch (error) {
                     setClientPromptError(error.message || 'Falha ao conectar com o servidor.');
@@ -312,6 +338,86 @@ export default function ClientConfigurations({ apiBaseUrl, token, onAction }) {
         } finally {
             setSavingClientPrompt(false);
         }
+    };
+
+    const handleSaveTopic = async (index) => {
+        const currentTopic = topics[index];
+        
+        setSavingTopicIndex(index);
+        setTopicsError('');
+        try {
+            const url = `${apiBaseUrl}/topic-classification`;
+            const payload = { topic: currentTopic };
+            if (originalTopicToEdit && originalTopicToEdit !== '') {
+                payload.old_title = originalTopicToEdit;
+            }
+            const response = await fetch(url, {
+                method: 'PUT',
+                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (response.ok) {
+                setEditingTopicIndex(null);
+                setOriginalTopicToEdit(null);
+            } else {
+                const errorData = await response.json().catch(() => ({}));
+                setTopicsError(errorData.detail || `Erro ao salvar classificação: Status ${response.status}`);
+            }
+        } catch (error) {
+            setTopicsError(error.message || 'Falha ao salvar classificação.');
+        } finally {
+            setSavingTopicIndex(null);
+        }
+    };
+
+    const handleTopicChange = (index, field, value) => {
+        const newTopics = [...topics];
+        newTopics[index] = { ...newTopics[index], [field]: value };
+        setTopics(newTopics);
+    };
+
+    const handleAddTopic = () => {
+        setTopics([...topics, { title: '', description: '' }]);
+        setEditingTopicIndex(topics.length);
+        setOriginalTopicToEdit('');
+        
+        setTimeout(() => {
+            const endElement = document.getElementById("topics-end");
+            if (endElement) {
+                endElement.scrollIntoView({ behavior: 'smooth' });
+            }
+        }, 100);
+    };
+
+    const handleRemoveTopic = (indexToRemove) => {
+        const topicToRemove = topics[indexToRemove];
+        
+        onAction(
+            `Você tem certeza que quer remover a classificação "${topicToRemove.title}"?`,
+            async () => {
+                setTopicsError('');
+                try {
+                    const url = `${apiBaseUrl}/topic-classification`;
+                    const response = await fetch(url, {
+                        method: 'DELETE',
+                        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ topic: topicToRemove })
+                    });
+
+                    if (response.ok) {
+                        const updatedTopics = topics.filter((_, index) => index !== indexToRemove);
+                        setTopics(updatedTopics);
+                        setEditingTopicIndex(null);
+                    } else {
+                        const errorData = await response.json().catch(() => ({}));
+                        throw new Error(errorData.detail || `Erro ao remover classificação: Status ${response.status}`);
+                    }
+                } catch (error) {
+                    setTopicsError(error.message || 'Falha ao remover classificação.');
+                }
+            }
+        );
     };
 
     const handleSaveWebsite = async () => {
@@ -729,6 +835,79 @@ export default function ClientConfigurations({ apiBaseUrl, token, onAction }) {
                                         className={`w-full h-64 p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 resize-y overflow-auto ${!isEditingClientPrompt ? 'bg-gray-100' : ''}`}
                                         placeholder="Nenhum prompt do sistema encontrado."
                                     />
+                                </div>
+                                
+                                <div>
+                                    <div className="flex justify-between items-center mt-8 mb-4">
+                                        <h4 className="text-lg font-semibold text-gray-700">Classificação das conversas</h4>
+                                        <button
+                                            onClick={handleAddTopic}
+                                            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 focus:outline-none"
+                                        >
+                                            Adicionar Classificação
+                                        </button>
+                                    </div>
+                                    
+                                    {topicsError && <p className="text-red-500 mb-4">{topicsError}</p>}
+                                    
+                                    <div className="space-y-4">
+                                        {topics.length === 0 && !editingTopicIndex && (
+                                            <p className="text-gray-500">Nenhuma classificação encontrada.</p>
+                                        )}
+                                        {topics.map((topic, index) => (
+                                            <div key={index} className="flex flex-col bg-white border border-gray-200 rounded-lg shadow-sm p-4 space-y-4">
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                    <div>
+                                                        <label className="block text-sm font-medium text-gray-700 mb-1">Título</label>
+                                                        <input
+                                                            type="text"
+                                                            value={topic.title}
+                                                            onChange={(e) => handleTopicChange(index, 'title', e.target.value)}
+                                                            readOnly={editingTopicIndex !== index}
+                                                            className={`w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 ${editingTopicIndex !== index ? 'bg-gray-100' : ''}`}
+                                                            placeholder="Título da classificação"
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-sm font-medium text-gray-700 mb-1">Descrição</label>
+                                                        <input
+                                                            type="text"
+                                                            value={topic.description}
+                                                            onChange={(e) => handleTopicChange(index, 'description', e.target.value)}
+                                                            readOnly={editingTopicIndex !== index}
+                                                            className={`w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 ${editingTopicIndex !== index ? 'bg-gray-100' : ''}`}
+                                                            placeholder="Descrição da classificação"
+                                                        />
+                                                    </div>
+                                                </div>
+                                                <div className="flex space-x-2 self-end mt-2">
+                                                    {editingTopicIndex === index ? (
+                                                        <button
+                                                            onClick={() => handleSaveTopic(index)}
+                                                            disabled={savingTopicIndex === index}
+                                                            className={`px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 focus:outline-none ${savingTopicIndex === index ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                                        >
+                                                            {savingTopicIndex === index ? 'Salvando...' : 'Salvar'}
+                                                        </button>
+                                                    ) : (
+                                                        <button
+                                                            onClick={() => {setEditingTopicIndex(index); setOriginalTopicToEdit(topic.title);}}
+                                                            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 focus:outline-none"
+                                                        >
+                                                            Editar
+                                                        </button>
+                                                    )}
+                                                    <button
+                                                        onClick={() => handleRemoveTopic(index)}
+                                                        className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 focus:outline-none"
+                                                    >
+                                                        Remover
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                        <div id="topics-end" />
+                                    </div>
                                 </div>
                             </div>
                         )}
