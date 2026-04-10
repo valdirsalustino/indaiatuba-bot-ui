@@ -96,7 +96,12 @@ export default function Dashboard({ onClose, apiBaseUrl, token }) {
         );
     };
 
+    // 1. Total geral de conversas para os gráficos de Tópicos (data)
     const totalConversations = data.reduce((sum, item) => sum + (item.count || 0), 0);
+
+    // 2. Total exclusivo para o gráfico de Tempo de Espera (waitData)
+    // Assume que a API retorna o "count" apenas dos atendimentos fechados pelo assistente
+    const totalWaitConversations = waitData.reduce((sum, item) => sum + (item.count || 0), 0);
 
     return (
         <div className="flex-1 flex flex-col bg-gray-50 h-full overflow-hidden">
@@ -236,7 +241,10 @@ export default function Dashboard({ onClose, apiBaseUrl, token }) {
                     {(loading || waitData.length > 0) && (
                         <div className="w-full bg-white p-6 rounded-2xl shadow-sm border border-gray-100 min-h-[500px] flex flex-col relative">
                             <div className="flex justify-between items-center mb-6 border-b border-gray-100 pb-4">
-                                <h2 className="text-lg font-bold text-gray-800">Tempo de Espera para Atendimento (por Setor)</h2>
+                                {/* Título atualizado usando totalWaitConversations */}
+                                <h2 className="text-lg font-bold text-gray-800">
+                                    Tempo de Espera para Atendimento (por Setor) em {totalWaitConversations} conversas
+                                </h2>
                                 <div className="flex items-center space-x-1 bg-gray-100 p-1 rounded-lg border border-gray-200">
                                     <button onClick={() => setWaitChartType('bar')} className={`px-4 py-2 text-sm font-medium rounded-md transition-all duration-200 ${waitChartType === 'bar' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200'}`}>Barras</button>
                                     <button onClick={() => setWaitChartType('pie')} className={`px-4 py-2 text-sm font-medium rounded-md transition-all duration-200 ${waitChartType === 'pie' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200'}`}>Pizza</button>
