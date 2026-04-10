@@ -19,14 +19,31 @@ const ALL_STATUSES = [
     { id: 'closed_by_user', label: 'Fechado pelo Usuário' }
 ];
 
+const CustomCountTooltip = ({ active, payload, label }) => {
+    if (active && payload && payload.length) {
+        const topicName = label || payload[0].name || payload[0].payload.topic;
+        const count = payload[0].value;
+
+        return (
+            <div className="bg-white p-3 border border-gray-200 rounded-lg shadow-md font-sans">
+                <p className="font-bold text-gray-800">{topicName}</p>
+                <p className="text-gray-600 mt-1">
+                    {count} {count === 1 ? 'conversa' : 'conversas'}
+                </p>
+            </div>
+        );
+    }
+    return null;
+};
+
 export default function Dashboard({ onClose, apiBaseUrl, token }) {
     const [countChartType, setCountChartType] = useState('bar');
     const [timeChartType, setTimeChartType] = useState('bar');
-    const [waitChartType, setWaitChartType] = useState('bar'); // State for 3rd chart
+    const [waitChartType, setWaitChartType] = useState('bar');
 
     const [selectedStatuses, setSelectedStatuses] = useState(ALL_STATUSES.filter(s => s.id !== 'open').map(s => s.id));
     const [data, setData] = useState([]);
-    const [waitData, setWaitData] = useState([]); // State for wait time data
+    const [waitData, setWaitData] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
 
@@ -78,6 +95,8 @@ export default function Dashboard({ onClose, apiBaseUrl, token }) {
                 : [...prev, statusId]
         );
     };
+
+    const totalConversations = data.reduce((sum, item) => sum + (item.count || 0), 0);
 
     return (
         <div className="flex-1 flex flex-col bg-gray-50 h-full overflow-hidden">
@@ -134,7 +153,9 @@ export default function Dashboard({ onClose, apiBaseUrl, token }) {
                     {(loading || data.length > 0) && (
                         <div className="w-full bg-white p-6 rounded-2xl shadow-sm border border-gray-100 min-h-[500px] flex flex-col relative">
                             <div className="flex justify-between items-center mb-6 border-b border-gray-100 pb-4">
-                                <h2 className="text-lg font-bold text-gray-800">Volume de Conversas por Tópico</h2>
+                                <h2 className="text-lg font-bold text-gray-800">
+                                    Volume de Conversas por Tópico - Total {totalConversations} conversas
+                                </h2>
                                 <div className="flex items-center space-x-1 bg-gray-100 p-1 rounded-lg border border-gray-200">
                                     <button onClick={() => setCountChartType('bar')} className={`px-4 py-2 text-sm font-medium rounded-md transition-all duration-200 ${countChartType === 'bar' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200'}`}>Barras</button>
                                     <button onClick={() => setCountChartType('pie')} className={`px-4 py-2 text-sm font-medium rounded-md transition-all duration-200 ${countChartType === 'pie' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200'}`}>Pizza</button>
@@ -148,7 +169,7 @@ export default function Dashboard({ onClose, apiBaseUrl, token }) {
                                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
                                                 <XAxis dataKey="topic" angle={-45} textAnchor="end" height={100} tick={{ fill: '#4B5563', fontSize: 12 }} interval={0} />
                                                 <YAxis tick={{ fill: '#4B5563', fontSize: 12 }} />
-                                                <Tooltip contentStyle={{ borderRadius: '8px' }} />
+                                                <Tooltip content={<CustomCountTooltip />} cursor={{ fill: 'transparent' }} />
                                                 <Bar dataKey="count" fill="#3B82F6" radius={[6, 6, 0, 0]}>
                                                     {data.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
                                                 </Bar>
@@ -158,7 +179,7 @@ export default function Dashboard({ onClose, apiBaseUrl, token }) {
                                                 <Pie data={data} cx="50%" cy="50%" label={({ topic, percent }) => `${topic} (${(percent * 100).toFixed(0)}%)`} outerRadius={120} dataKey="count" nameKey="topic">
                                                     {data.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
                                                 </Pie>
-                                                <Tooltip />
+                                                <Tooltip content={<CustomCountTooltip />} />
                                                 <Legend verticalAlign="bottom" />
                                             </PieChart>
                                         )}
@@ -172,7 +193,9 @@ export default function Dashboard({ onClose, apiBaseUrl, token }) {
                     {(loading || data.length > 0) && (
                         <div className="w-full bg-white p-6 rounded-2xl shadow-sm border border-gray-100 min-h-[500px] flex flex-col relative">
                             <div className="flex justify-between items-center mb-6 border-b border-gray-100 pb-4">
-                                <h2 className="text-lg font-bold text-gray-800">Tempo Médio de Conversa (por Tópico)</h2>
+                                <h2 className="text-lg font-bold text-gray-800">
+                                    Tempo Médio de Conversa (por Tópico) em {totalConversations} conversas
+                                </h2>
                                 <div className="flex items-center space-x-1 bg-gray-100 p-1 rounded-lg border border-gray-200">
                                     <button onClick={() => setTimeChartType('bar')} className={`px-4 py-2 text-sm font-medium rounded-md transition-all duration-200 ${timeChartType === 'bar' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200'}`}>Barras</button>
                                     <button onClick={() => setTimeChartType('pie')} className={`px-4 py-2 text-sm font-medium rounded-md transition-all duration-200 ${timeChartType === 'pie' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200'}`}>Pizza</button>
@@ -186,7 +209,8 @@ export default function Dashboard({ onClose, apiBaseUrl, token }) {
                                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
                                                 <XAxis dataKey="topic" angle={-45} textAnchor="end" height={100} tick={{ fill: '#4B5563', fontSize: 12 }} interval={0} />
                                                 <YAxis tick={{ fill: '#4B5563', fontSize: 12 }} label={{ value: 'Minutos', angle: -90, position: 'insideLeft', offset: -10 }} />
-                                                <Tooltip />
+                                                {/* Tooltip Atualizado com formatter */}
+                                                <Tooltip formatter={(value) => [value, 'Tempo médio (minutos)']} />
                                                 <Bar dataKey="avg_duration_minutes" fill="#10B981" radius={[6, 6, 0, 0]}>
                                                     {data.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
                                                     <ErrorBar dataKey="stderr_minutes" width={4} strokeWidth={2} stroke="#374151" direction="y" />
@@ -197,7 +221,8 @@ export default function Dashboard({ onClose, apiBaseUrl, token }) {
                                                 <Pie data={data} cx="50%" cy="50%" label={({ topic, avg_duration_minutes }) => `${topic} (${avg_duration_minutes} min)`} outerRadius={120} dataKey="avg_duration_minutes" nameKey="topic">
                                                     {data.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
                                                 </Pie>
-                                                <Tooltip formatter={(value, name, props) => [`${value} minutos (±${props.payload.stderr_minutes})`, name]} />
+                                                {/* Tooltip Atualizado com formatter */}
+                                                <Tooltip formatter={(value, name, props) => [`${value} min (±${props.payload.stderr_minutes})`, 'Tempo médio (minutos)']} />
                                                 <Legend verticalAlign="bottom" />
                                             </PieChart>
                                         )}
@@ -225,7 +250,8 @@ export default function Dashboard({ onClose, apiBaseUrl, token }) {
                                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
                                                 <XAxis dataKey="department" angle={-45} textAnchor="end" height={100} tick={{ fill: '#4B5563', fontSize: 12 }} interval={0} />
                                                 <YAxis tick={{ fill: '#4B5563', fontSize: 12 }} label={{ value: 'Minutos', angle: -90, position: 'insideLeft', offset: -10 }} />
-                                                <Tooltip />
+                                                {/* Tooltip Atualizado com formatter */}
+                                                <Tooltip formatter={(value) => [value, 'Tempo de espera (minutos)']} />
                                                 <Bar dataKey="avg_wait_minutes" fill="#F59E0B" radius={[6, 6, 0, 0]}>
                                                     {waitData.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[(index + 4) % COLORS.length]} />)}
                                                     <ErrorBar dataKey="stderr_minutes" width={4} strokeWidth={2} stroke="#374151" direction="y" />
@@ -236,7 +262,8 @@ export default function Dashboard({ onClose, apiBaseUrl, token }) {
                                                 <Pie data={waitData} cx="50%" cy="50%" label={({ department, avg_wait_minutes }) => `${department} (${avg_wait_minutes} min)`} outerRadius={120} dataKey="avg_wait_minutes" nameKey="department">
                                                     {waitData.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[(index + 4) % COLORS.length]} />)}
                                                 </Pie>
-                                                <Tooltip formatter={(value, name, props) => [`${value} minutos (±${props.payload.stderr_minutes})`, name]} />
+                                                {/* Tooltip Atualizado com formatter */}
+                                                <Tooltip formatter={(value, name, props) => [`${value} min (±${props.payload.stderr_minutes})`, 'Tempo de espera (minutos)']} />
                                                 <Legend verticalAlign="bottom" />
                                             </PieChart>
                                         )}
