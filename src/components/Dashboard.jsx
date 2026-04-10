@@ -305,6 +305,66 @@ export default function Dashboard({ onClose, apiBaseUrl, token }) {
                         </div>
                     )}
 
+                    {/* Chart 4: Histograms per Department */}
+                    {(loading || waitData.length > 0) && (
+                        <div className="w-full bg-white p-6 rounded-2xl shadow-sm border border-gray-100 min-h-[400px] flex flex-col relative">
+                            <div className="mb-6 border-b border-gray-100 pb-4">
+                                <h2 className="text-lg font-bold text-gray-800">
+                                    Distribuição do Tempo de Espera por Setor em {totalWaitConversations} de {absoluteTotalWait} conversas ({percWait}%)
+                                </h2>
+                                <p className="text-sm text-gray-500 mt-1">
+                                    Frequência do tempo de espera (histogramas) para analisar a concentração dos atrasos.
+                                </p>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 w-full">
+                                {!loading && waitData.map((deptData, index) => (
+                                    <div key={`hist-${deptData.department}`} className="bg-gray-50 border border-gray-200 rounded-xl p-4 shadow-sm flex flex-col h-[280px]">
+                                        <h3 className="text-sm font-bold text-gray-700 text-center mb-2">
+                                            {deptData.department}
+                                        </h3>
+                                        <div className="flex-1 w-full relative">
+                                            {deptData.histogram && deptData.histogram.length > 0 ? (
+                                                <ResponsiveContainer width="100%" height="100%">
+                                                    <BarChart
+                                                        data={deptData.histogram}
+                                                        margin={{ top: 10, right: 10, left: -20, bottom: 25 }}
+                                                        barCategoryGap={1}
+                                                    >
+                                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
+                                                        <XAxis
+                                                            dataKey="bin"
+                                                            angle={-45}
+                                                            textAnchor="end"
+                                                            height={40}
+                                                            tick={{ fill: '#4B5563', fontSize: 10 }}
+                                                            interval={0}
+                                                        />
+                                                        <YAxis tick={{ fill: '#4B5563', fontSize: 10 }} />
+                                                        <Tooltip
+                                                            formatter={(value) => [value, 'Conversas']}
+                                                            labelFormatter={(label) => `Tempo: ${label} min`}
+                                                            cursor={{ fill: '#E5E7EB' }}
+                                                        />
+                                                        <Bar
+                                                            dataKey="count"
+                                                            fill={COLORS[(index + 4) % COLORS.length]}
+                                                            radius={[2, 2, 0, 0]}
+                                                        />
+                                                    </BarChart>
+                                                </ResponsiveContainer>
+                                            ) : (
+                                                <div className="flex items-center justify-center h-full text-gray-400 text-xs text-center px-4">
+                                                    Dados de distribuição (bins) não disponíveis na API.
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
                 </div>
             </div>
         </div>
