@@ -8,6 +8,7 @@ import ChatWindow from './components/ChatWindow.jsx';
 import ConfirmationModal from './components/ConfirmationModal.jsx';
 import UserManagement from './components/UserManagement.jsx';
 import ClientConfigurations from './components/ClientConfigurations.jsx';
+import Dashboard from './components/Dashboard.jsx';
 
 // Logic to determine WebSocket protocol
 const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -517,19 +518,22 @@ function App() {
         message={modalState.message}
       />
       <div className="w-full h-full flex shadow-lg">
-        <ConversationList
-          conversations={conversations}
-          onSelect={handleSelectConversation}
-          selectedId={selectedConversation?.composite_id}
-          onLogout={handleLogout}
-          anyNeedsAttention={anyNeedsAttention}
-          isAdmin={currentUser.role === 'Admin'}
-          onShowUserManagement={() => setActiveView('userManagement')}
-          onShowClientConfigs={() => setActiveView('clientConfigurations')}
-          onShowConversations={() => setActiveView('conversations')}
-          currentUser={currentUser}
-          onLoadMore={loadMoreConversations}
-        />
+        {activeView !== 'dashboard' && (
+          <ConversationList
+            conversations={conversations}
+            onSelect={handleSelectConversation}
+            selectedId={selectedConversation?.composite_id}
+            onLogout={handleLogout}
+            anyNeedsAttention={anyNeedsAttention}
+            isAdmin={currentUser.role === 'Admin'}
+            onShowUserManagement={() => setActiveView('userManagement')}
+            onShowClientConfigs={() => setActiveView('clientConfigurations')}
+            onShowDashboard={() => setActiveView('dashboard')}
+            onShowConversations={() => setActiveView('conversations')}
+            currentUser={currentUser}
+            onLoadMore={loadMoreConversations}
+          />
+        )}
 
         {activeView === 'conversations' && (
             <ChatWindow
@@ -559,6 +563,14 @@ function App() {
                 apiBaseUrl={apiBaseUrl}
                 onClose={() => setActiveView('conversations')}
                 onAction={(message, onConfirm) => setModalState({ isOpen: true, message, onConfirm })}
+            />
+        )}
+
+        {activeView === 'dashboard' && currentUser.role === 'Admin' && (
+            <Dashboard 
+                onClose={() => setActiveView('conversations')} 
+                apiBaseUrl={apiBaseUrl} 
+                token={token} 
             />
         )}
       </div>
