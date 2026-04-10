@@ -44,6 +44,11 @@ export default function Dashboard({ onClose, apiBaseUrl, token }) {
     const [selectedStatuses, setSelectedStatuses] = useState(ALL_STATUSES.filter(s => s.id !== 'open').map(s => s.id));
     const [data, setData] = useState([]);
     const [waitData, setWaitData] = useState([]);
+
+    // Novos estados para armazenar os totais absolutos (sem filtros)
+    const [absoluteTotalTopics, setAbsoluteTotalTopics] = useState(0);
+    const [absoluteTotalWait, setAbsoluteTotalWait] = useState(0);
+
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
 
@@ -52,20 +57,29 @@ export default function Dashboard({ onClose, apiBaseUrl, token }) {
         setLoading(true);
         setError(null);
         try {
+            // Query para os dados filtrados
             const statusQuery = selectedStatuses.length > 0 ? `?statuses=${selectedStatuses.join(',')}` : '?statuses=none';
+            // Query para buscar TUDO (necessário para calcular a porcentagem total)
+            const allStatusesQuery = `?statuses=${ALL_STATUSES.map(s => s.id).join(',')}`;
 
-            const [topicsRes, waitTimesRes] = await Promise.all([
+            // Realiza as buscas em paralelo para dados filtrados e totais globais
+            const [topicsRes, waitTimesRes, allTopicsRes, allWaitTimesRes] = await Promise.all([
                 fetch(`${apiBaseUrl}/analytics/topics${statusQuery}`, { headers: { 'Authorization': `Bearer ${token}` } }),
-                fetch(`${apiBaseUrl}/analytics/wait-times${statusQuery}`, { headers: { 'Authorization': `Bearer ${token}` } })
+                fetch(`${apiBaseUrl}/analytics/wait-times${statusQuery}`, { headers: { 'Authorization': `Bearer ${token}` } }),
+                fetch(`${apiBaseUrl}/analytics/topics${allStatusesQuery}`, { headers: { 'Authorization': `Bearer ${token}` } }),
+                fetch(`${apiBaseUrl}/analytics/wait-times${allStatusesQuery}`, { headers: { 'Authorization': `Bearer ${token}` } })
             ]);
 
-            if (!topicsRes.ok || !waitTimesRes.ok) {
+            if (!topicsRes.ok || !waitTimesRes.ok || !allTopicsRes.ok || !allWaitTimesRes.ok) {
                 throw new Error('Falha ao buscar dados analíticos');
             }
 
             const topicsResult = await topicsRes.json();
             const waitTimesResult = await waitTimesRes.json();
+            const allTopicsResult = await allTopicsRes.json();
+            const allWaitTimesResult = await allWaitTimesRes.json();
 
+            // Atualiza os dados filtrados dos gráficos
             setData(topicsResult.map(d => ({
                 ...d,
                 avg_duration_minutes: Number((d.avg_duration_minutes || 0).toFixed(2)),
@@ -77,6 +91,11 @@ export default function Dashboard({ onClose, apiBaseUrl, token }) {
                 avg_wait_minutes: Number((d.avg_wait_minutes || 0).toFixed(2)),
                 stderr_minutes: Number((d.stderr_minutes || 0).toFixed(2))
             })));
+
+            // Calcula e salva os totais absolutos no estado
+            setAbsoluteTotalTopics(allTopicsResult.reduce((sum, item) => sum + (item.count || 0), 0));
+            setAbsoluteTotalWait(allWaitTimesResult.reduce((sum, item) => sum + (item.count || 0), 0));
+
         } catch (err) {
             setError(err.message);
         } finally {
@@ -96,12 +115,15 @@ export default function Dashboard({ onClose, apiBaseUrl, token }) {
         );
     };
 
-    // 1. Total geral de conversas para os gráficos de Tópicos (data)
+    // Cálculos dos totais filtrados e porcentagens correspondentes
     const totalConversations = data.reduce((sum, item) => sum + (item.count || 0), 0);
 
     // 2. Total exclusivo para o gráfico de Tempo de Espera (waitData)
     // Assume que a API retorna o "count" apenas dos atendimentos fechados pelo assistente
     const totalWaitConversations = waitData.reduce((sum, item) => sum + (item.count || 0), 0);
+
+    const percTopics = absoluteTotalTopics > 0 ? Math.round((totalConversations / absoluteTotalTopics) * 100) : 0;
+    const percWait = absoluteTotalWait > 0 ? Math.round((totalWaitConversations / absoluteTotalWait) * 100) : 0;
 
     return (
         <div className="flex-1 flex flex-col bg-gray-50 h-full overflow-hidden">
@@ -158,8 +180,9 @@ export default function Dashboard({ onClose, apiBaseUrl, token }) {
                     {(loading || data.length > 0) && (
                         <div className="w-full bg-white p-6 rounded-2xl shadow-sm border border-gray-100 min-h-[500px] flex flex-col relative">
                             <div className="flex justify-between items-center mb-6 border-b border-gray-100 pb-4">
+                                {/* Header 1 atualizado */}
                                 <h2 className="text-lg font-bold text-gray-800">
-                                    Volume de Conversas por Tópico - Total {totalConversations} conversas
+                                    Volume de Conversas por Tópico - Total {totalConversations} de {absoluteTotalTopics} conversas ({percTopics}%)
                                 </h2>
                                 <div className="flex items-center space-x-1 bg-gray-100 p-1 rounded-lg border border-gray-200">
                                     <button onClick={() => setCountChartType('bar')} className={`px-4 py-2 text-sm font-medium rounded-md transition-all duration-200 ${countChartType === 'bar' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200'}`}>Barras</button>
@@ -198,8 +221,9 @@ export default function Dashboard({ onClose, apiBaseUrl, token }) {
                     {(loading || data.length > 0) && (
                         <div className="w-full bg-white p-6 rounded-2xl shadow-sm border border-gray-100 min-h-[500px] flex flex-col relative">
                             <div className="flex justify-between items-center mb-6 border-b border-gray-100 pb-4">
+                                {/* Header 2 atualizado */}
                                 <h2 className="text-lg font-bold text-gray-800">
-                                    Tempo Médio de Conversa (por Tópico) em {totalConversations} conversas
+                                    Tempo Médio de Conversa (por Tópico) em {totalConversations} de {absoluteTotalTopics} conversas ({percTopics}%)
                                 </h2>
                                 <div className="flex items-center space-x-1 bg-gray-100 p-1 rounded-lg border border-gray-200">
                                     <button onClick={() => setTimeChartType('bar')} className={`px-4 py-2 text-sm font-medium rounded-md transition-all duration-200 ${timeChartType === 'bar' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200'}`}>Barras</button>
@@ -241,9 +265,9 @@ export default function Dashboard({ onClose, apiBaseUrl, token }) {
                     {(loading || waitData.length > 0) && (
                         <div className="w-full bg-white p-6 rounded-2xl shadow-sm border border-gray-100 min-h-[500px] flex flex-col relative">
                             <div className="flex justify-between items-center mb-6 border-b border-gray-100 pb-4">
-                                {/* Título atualizado usando totalWaitConversations */}
+                                {/* Header 3 atualizado */}
                                 <h2 className="text-lg font-bold text-gray-800">
-                                    Tempo de Espera para Atendimento (por Setor) em {totalWaitConversations} conversas
+                                    Tempo de Espera para Atendimento (por Setor) em {totalWaitConversations} de {absoluteTotalWait} conversas ({percWait}%)
                                 </h2>
                                 <div className="flex items-center space-x-1 bg-gray-100 p-1 rounded-lg border border-gray-200">
                                     <button onClick={() => setWaitChartType('bar')} className={`px-4 py-2 text-sm font-medium rounded-md transition-all duration-200 ${waitChartType === 'bar' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200'}`}>Barras</button>
