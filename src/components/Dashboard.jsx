@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ErrorBar
+    PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ErrorBar
 } from 'recharts';
 
 const CloseIcon = () => (
@@ -9,6 +9,21 @@ const CloseIcon = () => (
         <line x1="6" y1="6" x2="18" y2="18"></line>
     </svg>
 );
+
+const formatTime = (minutesValue) => {
+    if (minutesValue == null || isNaN(minutesValue)) return '0 min';
+    const minutes = Number(minutesValue);
+    if (minutes < 60) {
+        // Keeps one decimal place if it's not a whole number to match original behavior, or just integer
+        return `${Number(minutes.toFixed(1))} min`;
+    }
+    const hours = Math.floor(minutes / 60);
+    const mins = Math.floor(minutes % 60);
+    if (mins === 0) {
+        return `${hours}h`;
+    }
+    return `${hours}h ${mins} min`;
+};
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#8dd1e1', '#a4de6c', '#d0ed57', '#ffc658'];
 
@@ -161,7 +176,7 @@ export default function Dashboard({ onClose, apiBaseUrl, token }) {
 
             {/* Content */}
             <div className="flex-1 overflow-y-auto w-full p-6">
-                <div className="max-w-7xl mx-auto space-y-8 flex flex-col items-center justify-start h-full">
+                <div className="max-w-7xl mx-auto space-y-8 flex flex-col items-center justify-start min-h-full pb-8">
 
                     {error && (
                         <div className="w-full flex flex-col items-center justify-center text-red-500 bg-red-50 rounded-xl border border-red-100 p-6 text-center">
@@ -178,7 +193,7 @@ export default function Dashboard({ onClose, apiBaseUrl, token }) {
 
                     {/* Chart 1: Topic Count */}
                     {(loading || data.length > 0) && (
-                        <div className="w-full bg-white p-6 rounded-2xl shadow-sm border border-gray-100 min-h-[500px] flex flex-col relative">
+                        <div className="w-full bg-white p-6 rounded-2xl shadow-sm border border-gray-100 h-[500px] flex flex-col relative">
                             <div className="flex justify-between items-center mb-6 border-b border-gray-100 pb-4">
                                 {/* Header 1 atualizado */}
                                 <h2 className="text-lg font-bold text-gray-800">
@@ -219,7 +234,7 @@ export default function Dashboard({ onClose, apiBaseUrl, token }) {
 
                     {/* Chart 2: Average Time (Topics) */}
                     {(loading || data.length > 0) && (
-                        <div className="w-full bg-white p-6 rounded-2xl shadow-sm border border-gray-100 min-h-[500px] flex flex-col relative">
+                        <div className="w-full bg-white p-6 rounded-2xl shadow-sm border border-gray-100 h-[500px] flex flex-col relative">
                             <div className="flex justify-between items-center mb-6 border-b border-gray-100 pb-4">
                                 {/* Header 2 atualizado */}
                                 <h2 className="text-lg font-bold text-gray-800">
@@ -239,7 +254,7 @@ export default function Dashboard({ onClose, apiBaseUrl, token }) {
                                                 <XAxis dataKey="topic" angle={-45} textAnchor="end" height={100} tick={{ fill: '#4B5563', fontSize: 12 }} interval={0} />
                                                 <YAxis tick={{ fill: '#4B5563', fontSize: 12 }} label={{ value: 'Minutos', angle: -90, position: 'insideLeft', offset: -10 }} />
                                                 {/* Tooltip Atualizado com formatter */}
-                                                <Tooltip formatter={(value) => [value, 'Tempo médio (minutos)']} />
+                                                <Tooltip formatter={(value) => [formatTime(value), 'Tempo médio']} />
                                                 <Bar dataKey="avg_duration_minutes" fill="#10B981" radius={[6, 6, 0, 0]}>
                                                     {data.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
                                                     <ErrorBar dataKey="stderr_minutes" width={4} strokeWidth={2} stroke="#374151" direction="y" />
@@ -247,11 +262,11 @@ export default function Dashboard({ onClose, apiBaseUrl, token }) {
                                             </BarChart>
                                         ) : (
                                             <PieChart style={{ fontSize: '12px' }}>
-                                                <Pie data={data} cx="50%" cy="50%" label={({ topic, avg_duration_minutes }) => `${topic} (${avg_duration_minutes} min)`} outerRadius={120} dataKey="avg_duration_minutes" nameKey="topic">
+                                                <Pie data={data} cx="50%" cy="50%" label={({ topic, avg_duration_minutes }) => `${topic} (${formatTime(avg_duration_minutes)})`} outerRadius={120} dataKey="avg_duration_minutes" nameKey="topic">
                                                     {data.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
                                                 </Pie>
                                                 {/* Tooltip Atualizado com formatter */}
-                                                <Tooltip formatter={(value, name, props) => [`${value} min (±${props.payload.stderr_minutes})`, 'Tempo médio (minutos)']} />
+                                                <Tooltip formatter={(value, name, props) => [`${formatTime(value)} (±${formatTime(props.payload.stderr_minutes)})`, 'Tempo médio']} />
                                                 <Legend verticalAlign="bottom" />
                                             </PieChart>
                                         )}
@@ -263,7 +278,7 @@ export default function Dashboard({ onClose, apiBaseUrl, token }) {
 
                     {/* Chart 3: Wait Time (Departments) */}
                     {(loading || waitData.length > 0) && (
-                        <div className="w-full bg-white p-6 rounded-2xl shadow-sm border border-gray-100 min-h-[500px] flex flex-col relative">
+                        <div className="w-full bg-white p-6 rounded-2xl shadow-sm border border-gray-100 h-[500px] flex flex-col relative">
                             <div className="flex justify-between items-center mb-6 border-b border-gray-100 pb-4">
                                 {/* Header 3 atualizado */}
                                 <h2 className="text-lg font-bold text-gray-800">
@@ -283,7 +298,7 @@ export default function Dashboard({ onClose, apiBaseUrl, token }) {
                                                 <XAxis dataKey="department" angle={-45} textAnchor="end" height={100} tick={{ fill: '#4B5563', fontSize: 12 }} interval={0} />
                                                 <YAxis tick={{ fill: '#4B5563', fontSize: 12 }} label={{ value: 'Minutos', angle: -90, position: 'insideLeft', offset: -10 }} />
                                                 {/* Tooltip Atualizado com formatter */}
-                                                <Tooltip formatter={(value) => [value, 'Tempo de espera (minutos)']} />
+                                                <Tooltip formatter={(value) => [formatTime(value), 'Tempo de espera']} />
                                                 <Bar dataKey="avg_wait_minutes" fill="#F59E0B" radius={[6, 6, 0, 0]}>
                                                     {waitData.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[(index + 4) % COLORS.length]} />)}
                                                     <ErrorBar dataKey="stderr_minutes" width={4} strokeWidth={2} stroke="#374151" direction="y" />
@@ -291,11 +306,11 @@ export default function Dashboard({ onClose, apiBaseUrl, token }) {
                                             </BarChart>
                                         ) : (
                                             <PieChart style={{ fontSize: '12px' }}>
-                                                <Pie data={waitData} cx="50%" cy="50%" label={({ department, avg_wait_minutes }) => `${department} (${avg_wait_minutes} min)`} outerRadius={120} dataKey="avg_wait_minutes" nameKey="department">
+                                                <Pie data={waitData} cx="50%" cy="50%" label={({ department, avg_wait_minutes }) => `${department} (${formatTime(avg_wait_minutes)})`} outerRadius={120} dataKey="avg_wait_minutes" nameKey="department">
                                                     {waitData.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[(index + 4) % COLORS.length]} />)}
                                                 </Pie>
                                                 {/* Tooltip Atualizado com formatter */}
-                                                <Tooltip formatter={(value, name, props) => [`${value} min (±${props.payload.stderr_minutes})`, 'Tempo de espera (minutos)']} />
+                                                <Tooltip formatter={(value, name, props) => [`${formatTime(value)} (±${formatTime(props.payload.stderr_minutes)})`, 'Tempo de espera']} />
                                                 <Legend verticalAlign="bottom" />
                                             </PieChart>
                                         )}
@@ -307,7 +322,7 @@ export default function Dashboard({ onClose, apiBaseUrl, token }) {
 
                     {/* Chart 4: Histograms per Department */}
                     {(loading || waitData.length > 0) && (
-                        <div className="w-full bg-white p-6 rounded-2xl shadow-sm border border-gray-100 min-h-[400px] flex flex-col relative">
+                        <div className="w-full bg-white p-6 rounded-2xl shadow-sm border border-gray-100 min-h-[460px] flex flex-col relative">
                             <div className="mb-6 border-b border-gray-100 pb-4">
                                 <h2 className="text-lg font-bold text-gray-800">
                                     Distribuição do Tempo de Espera por Setor em {totalWaitConversations} de {absoluteTotalWait} conversas ({percWait}%)
@@ -319,7 +334,7 @@ export default function Dashboard({ onClose, apiBaseUrl, token }) {
 
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 w-full">
                                 {!loading && waitData.map((deptData, index) => (
-                                    <div key={`hist-${deptData.department}`} className="bg-gray-50 border border-gray-200 rounded-xl p-4 shadow-sm flex flex-col h-[280px]">
+                                    <div key={`hist-${deptData.department}`} className="bg-gray-50 border border-gray-200 rounded-xl p-4 shadow-sm flex flex-col h-[400px]">
                                         <h3 className="text-sm font-bold text-gray-700 text-center mb-2">
                                             {deptData.department}
                                         </h3>
@@ -328,7 +343,7 @@ export default function Dashboard({ onClose, apiBaseUrl, token }) {
                                                 <ResponsiveContainer width="100%" height="100%">
                                                     <BarChart
                                                         data={deptData.histogram}
-                                                        margin={{ top: 10, right: 10, left: -20, bottom: 25 }}
+                                                        margin={{ top: 10, right: 10, left: -20, bottom: 90 }}
                                                         barCategoryGap={1}
                                                     >
                                                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
@@ -336,14 +351,32 @@ export default function Dashboard({ onClose, apiBaseUrl, token }) {
                                                             dataKey="bin"
                                                             angle={-45}
                                                             textAnchor="end"
-                                                            height={40}
+                                                            height={130}
+                                                            tickFormatter={(value, index) => {
+                                                                const deptDataObj = waitData.find(d => d.department === deptData.department);
+                                                                if (deptDataObj && deptDataObj.histogram && deptDataObj.histogram[index]) {
+                                                                    const item = deptDataObj.histogram[index];
+                                                                    if (item.min != null && item.max != null) {
+                                                                        return `${formatTime(item.min)} - ${formatTime(item.max)}`;
+                                                                    }
+                                                                }
+                                                                return value;
+                                                            }}
                                                             tick={{ fill: '#4B5563', fontSize: 10 }}
                                                             interval={0}
                                                         />
                                                         <YAxis tick={{ fill: '#4B5563', fontSize: 10 }} />
                                                         <Tooltip
                                                             formatter={(value) => [value, 'Conversas']}
-                                                            labelFormatter={(label) => `Tempo: ${label} min`}
+                                                            labelFormatter={(label, payload) => {
+                                                                if (payload && payload.length > 0) {
+                                                                    const item = payload[0].payload;
+                                                                    if (item.min != null && item.max != null) {
+                                                                        return `Tempo: ${formatTime(item.min)} a ${formatTime(item.max)}`;
+                                                                    }
+                                                                }
+                                                                return `Tempo: ${label}`;
+                                                            }}
                                                             cursor={{ fill: '#E5E7EB' }}
                                                         />
                                                         <Bar
