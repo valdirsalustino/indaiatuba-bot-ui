@@ -485,6 +485,34 @@ function App() {
   };
 
   const handleReopenThread = (compositeId) => {
+    const conversation = conversations.find(c => c.composite_id === compositeId);
+    
+    if (conversation) {
+        const userMessages = (conversation.messages || []).filter(m => m.sender === 'user');
+        let lastMessageDate = null;
+
+        if (userMessages.length > 0) {
+            lastMessageDate = new Date(userMessages[userMessages.length - 1].timestamp);
+        } else if (conversation.last_updated) {
+            lastMessageDate = new Date(conversation.last_updated);
+        }
+
+        if (lastMessageDate) {
+            const now = new Date();
+            const diffHours = (now - lastMessageDate) / (1000 * 60 * 60);
+
+            if (diffHours > 24) {
+                setModalState({
+                  isOpen: true,
+                  isAlert: true,
+                  message: 'Já se passaram 24h desde a última conversa recebida pelo cliente. Não é possível reabrir essa conversa.',
+                  onConfirm: null
+                });
+                return;
+            }
+        }
+    }
+
     setModalState({
       isOpen: true,
       message: 'Tem certeza que deseja reabrir esta conversa para enviar uma mensagem ao cliente?',
@@ -530,10 +558,13 @@ function App() {
         isOpen={modalState.isOpen}
         onClose={() => setModalState({ ...modalState, isOpen: false })}
         onConfirm={() => {
-          modalState.onConfirm();
+          if (modalState.onConfirm) {
+            modalState.onConfirm();
+          }
           setModalState({ ...modalState, isOpen: false });
         }}
         message={modalState.message}
+        isAlert={modalState.isAlert}
       />
       <div className="w-full h-full flex shadow-lg">
         {activeView !== 'dashboard' && (
