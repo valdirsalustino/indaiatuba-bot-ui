@@ -15,6 +15,8 @@ export default function ClientConfigurations({ apiBaseUrl, token, onAction }) {
     // Original states to detect changes
     const [originalClientInfo, setOriginalClientInfo] = useState({ name: '', website: '' });
     const [originalSystemPrompt, setOriginalSystemPrompt] = useState('');
+    const [welcomeMessage, setWelcomeMessage] = useState('');
+    const [originalWelcomeMessage, setOriginalWelcomeMessage] = useState('');
 
     // --- Topics States ---
     const [topics, setTopics] = useState([]);
@@ -119,6 +121,26 @@ export default function ClientConfigurations({ apiBaseUrl, token, onAction }) {
                         throw new Error(errorData.detail || `Erro ao carregar prompt: Status ${promptResponse.status}`);
                     } else {
                         setSystemPrompt('');
+                    }
+
+                    const welcomeUrl = `${apiBaseUrl}/welcome-message`;
+                    const welcomeResponse = await fetch(welcomeUrl, {
+                        method: 'GET',
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json'
+                        }
+                    });
+
+                    if (welcomeResponse.ok) {
+                        const welcomeData = await welcomeResponse.json();
+                        setWelcomeMessage(welcomeData.message || '');
+                        setOriginalWelcomeMessage(welcomeData.message || '');
+                    } else if (welcomeResponse.status !== 404) {
+                        const errorData = await welcomeResponse.json().catch(() => ({}));
+                        throw new Error(errorData.detail || `Erro ao carregar mensagem de saudação: Status ${welcomeResponse.status}`);
+                    } else {
+                        setWelcomeMessage('');
                     }
 
                     const topicsUrl = `${apiBaseUrl}/topic-classification`;
@@ -330,6 +352,21 @@ export default function ClientConfigurations({ apiBaseUrl, token, onAction }) {
                     throw new Error(errorData.detail || `Erro ao salvar prompt: Status ${promptResponse.status}`);
                 }
                 setOriginalSystemPrompt(systemPrompt);
+            }
+
+            if (welcomeMessage !== originalWelcomeMessage) {
+                const welcomeUrl = `${apiBaseUrl}/welcome-message`;
+                const welcomeResponse = await fetch(welcomeUrl, {
+                    method: 'PUT',
+                    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: welcomeMessage })
+                });
+
+                if (!welcomeResponse.ok) {
+                    const errorData = await welcomeResponse.json().catch(() => ({}));
+                    throw new Error(errorData.detail || `Erro ao salvar mensagem de saudação: Status ${welcomeResponse.status}`);
+                }
+                setOriginalWelcomeMessage(welcomeMessage);
             }
 
             setIsEditingClientPrompt(false);
@@ -834,6 +871,17 @@ export default function ClientConfigurations({ apiBaseUrl, token, onAction }) {
                                         readOnly={!isEditingClientPrompt}
                                         className={`w-full h-64 p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 resize-y overflow-auto ${!isEditingClientPrompt ? 'bg-gray-100' : ''}`}
                                         placeholder="Nenhum prompt do sistema encontrado."
+                                    />
+                                </div>
+
+                                <div>
+                                    <h4 className="text-lg font-semibold text-gray-700 mb-2">Mensagem de Saudação</h4>
+                                    <textarea
+                                        value={welcomeMessage}
+                                        onChange={(e) => setWelcomeMessage(e.target.value)}
+                                        readOnly={!isEditingClientPrompt}
+                                        className={`w-full h-32 p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 resize-y overflow-auto ${!isEditingClientPrompt ? 'bg-gray-100' : ''}`}
+                                        placeholder="Nenhuma mensagem de saudação."
                                     />
                                 </div>
                                 
