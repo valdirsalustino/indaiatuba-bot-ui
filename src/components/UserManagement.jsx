@@ -30,7 +30,7 @@ export default function UserManagement({ token, apiBaseUrl, onAction, currentUse
   const [isLoading, setIsLoading] = useState(false);
   const [users, setUsers] = useState([]);
   const [isAdding, setIsAdding] = useState(false);
-  const [newUser, setNewUser] = useState({ username: '', name: '', role: 'Social' });
+  const [newUser, setNewUser] = useState({ username: '', name: '', role: '' });
 
   const fetchUsers = async () => {
     try {
@@ -59,6 +59,13 @@ export default function UserManagement({ token, apiBaseUrl, onAction, currentUse
     setMessage('');
     setIsError(false);
 
+    if (!newUser.username || !newUser.name || !newUser.role) {
+      setMessage('Por favor, preencha todos os campos.');
+      setIsError(true);
+      setIsLoading(false);
+      return;
+    }
+
     try {
       const response = await fetch(`${apiBaseUrl}/users`, {
         method: 'POST',
@@ -74,7 +81,7 @@ export default function UserManagement({ token, apiBaseUrl, onAction, currentUse
       }
       setMessage(`User "${data.username}" created successfully! Password: ${data.temporary_password}`);
       setIsAdding(false);
-      setNewUser({ username: '', name: '', role: 'Social' });
+      setNewUser({ username: '', name: '', role: '' });
       fetchUsers(); // Refresh the user list
     } catch (err) {
       setMessage(err.message);
