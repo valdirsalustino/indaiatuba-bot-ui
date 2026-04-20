@@ -24,13 +24,13 @@ const CancelIcon = () => (
 );
 
 
-export default function UserManagement({ token, apiBaseUrl, onAction, currentUser }) {
+export default function UserManagement({ token, apiBaseUrl, onAction, currentUser, departments = [] }) {
   const [message, setMessage] = useState('');
   const [isError, setIsError] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [users, setUsers] = useState([]);
   const [isAdding, setIsAdding] = useState(false);
-  const [newUser, setNewUser] = useState({ username: '', name: '', role: 'Social' });
+  const [newUser, setNewUser] = useState({ username: '', name: '', role: '' });
 
   const fetchUsers = async () => {
     try {
@@ -59,6 +59,13 @@ export default function UserManagement({ token, apiBaseUrl, onAction, currentUse
     setMessage('');
     setIsError(false);
 
+    if (!newUser.username || !newUser.name || !newUser.role) {
+      setMessage('Por favor, preencha todos os campos.');
+      setIsError(true);
+      setIsLoading(false);
+      return;
+    }
+
     try {
       const response = await fetch(`${apiBaseUrl}/users`, {
         method: 'POST',
@@ -74,7 +81,7 @@ export default function UserManagement({ token, apiBaseUrl, onAction, currentUse
       }
       setMessage(`User "${data.username}" created successfully! Password: ${data.temporary_password}`);
       setIsAdding(false);
-      setNewUser({ username: '', name: '', role: 'Social' });
+      setNewUser({ username: '', name: '', role: '' });
       fetchUsers(); // Refresh the user list
     } catch (err) {
       setMessage(err.message);
@@ -86,7 +93,7 @@ export default function UserManagement({ token, apiBaseUrl, onAction, currentUse
 
   const handleUpdateUser = (username, data) => {
     onAction(
-      `Are you sure you want to update user "${username}"?`,
+      `Tem certeza que deseja atualizar o usuário "${username}"?`,
       async () => {
         try {
           const response = await fetch(`${apiBaseUrl}/users/${encodeURIComponent(username)}`, {
@@ -114,7 +121,7 @@ export default function UserManagement({ token, apiBaseUrl, onAction, currentUse
 
   const handleDelete = (username) => {
     onAction(
-        `Are you sure you want to delete the user "${username}"? This action cannot be undone.`,
+        `Tem certeza que deseja remover o usuário "${username}"? Esta ação não pode ser desfeita.`,
         async () => {
             try {
                 const response = await fetch(`${apiBaseUrl}/users/${encodeURIComponent(username)}`, {
@@ -180,9 +187,10 @@ export default function UserManagement({ token, apiBaseUrl, onAction, currentUse
                                         }
                                     }}
                                 >
-                                    <option value="Social">Social</option>
-                                    <option value="Administração">Administração</option>
-                                    <option value="Esporte, Cultura e Artes">Esporte, Cultura e Artes</option>
+                                    {departments.map(dep => {
+                                        const depName = typeof dep === 'object' ? dep.name : dep;
+                                        return <option key={depName} value={depName}>{depName}</option>;
+                                    })}
                                     <option value="Admin">Admin</option>
                                 </select>
                               </td>
@@ -222,9 +230,11 @@ export default function UserManagement({ token, apiBaseUrl, onAction, currentUse
                                       onChange={(e) => setNewUser({...newUser, role: e.target.value})}
                                       className="w-full p-1.5 border rounded-md"
                                   >
-                                      <option value="Social">Social</option>
-                                      <option value="Administração">Administração</option>
-                                      <option value="Esporte, Cultura e Artes">Esporte, Cultura e Artes</option>
+                                     <option value="" disabled>Selecione um papel</option>
+                                      {departments.map(dep => {
+                                          const depName = typeof dep === 'object' ? dep.name : dep;
+                                          return <option key={depName} value={depName}>{depName}</option>;
+                                      })}
                                       <option value="Admin">Admin</option>
                                   </select>
                               </td>

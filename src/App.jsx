@@ -8,6 +8,7 @@ import ChatWindow from './components/ChatWindow.jsx';
 import ConfirmationModal from './components/ConfirmationModal.jsx';
 import UserManagement from './components/UserManagement.jsx';
 import ClientConfigurations from './components/ClientConfigurations.jsx';
+import Dashboard from './components/Dashboard.jsx';
 
 // Logic to determine WebSocket protocol
 const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -64,8 +65,8 @@ function App() {
   const [selectedConversation, setSelectedConversation] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [anyNeedsAttention, setAnyNeedsAttention] = useState(false);
   const [activeView, setActiveView] = useState('conversations');
+  const [departments, setDepartments] = useState([]);
 
   // Pagination States
   const [skip, setSkip] = useState(0);
@@ -174,10 +175,6 @@ function App() {
         return newConversations;
       });
 
-      setAnyNeedsAttention(prev => prev || serverData.some(
-        conv => conv.status === 'open' && conv.human_supervision === true
-      ));
-
     } catch (err) {
       if (err.message !== 'Authentication failed') {
         setError(err.message);
@@ -186,6 +183,19 @@ function App() {
       setIsLoading(false);
     }
   }, [token, authFetch, apiBaseUrl]);
+
+  const fetchDepartments = useCallback(async () => {
+    if (!token) return;
+    try {
+        const response = await authFetch(`${apiBaseUrl}/departments`);
+        if (response.ok) {
+            const data = await response.json();
+            setDepartments(Array.isArray(data) ? data : []);
+        }
+    } catch (error) {
+        console.error("Failed to fetch departments:", error);
+    }
+  }, [token, apiBaseUrl, authFetch]);
 
   // Expose a loadMore function to pass to the ConversationList
   const loadMoreConversations = () => {
@@ -316,7 +326,10 @@ function App() {
                   ...targetConv,
                   messages: [...currentMessages, newMessage],
                   last_message: newMessage.text,
-                  last_updated: newMessage.timestamp
+                  last_updated: newMessage.timestamp,
+                  // FAILSFE: If backend sends status changes attached to the message
+                  ...(data.data.status !== undefined && { status: data.data.status }),
+                  ...(data.data.human_supervision !== undefined && { human_supervision: data.data.human_supervision })
               };
 
               const otherConvs = [
@@ -327,8 +340,20 @@ function App() {
               return [updatedConv, ...otherConvs];
             });
           }
-          else if (['new_handoff_request', 'conversation_resolved', 'supervision_type_changed', 'conversation_taken_over'].includes(data.update)) {
-            fetchConversations(0, false); // Refresh top items
+          // ADDED 'conversation_closed' and 'status_changed' to catch bot closing events
+          else if (['new_handoff_request', 'conversation_resolved', 'supervision_type_changed', 'conversation_taken_over', 'conversation_closed', 'status_changed'].includes(data.update)) {
+
+            if (data.update === 'new_handoff_request') {
+              try {
+                const pingSound = new Audio('/ping.mp3');
+                pingSound.play().catch(err => {
+                  console.warn("Navegador bloqueou a reprodução de áudio. O usuário precisa interagir com a página primeiro.", err);
+                });
+              } catch (err) {
+                console.error("Erro ao tentar tocar o áudio:", err);
+              }
+            }
+            fetchConversations(0, false);
           }
         } catch (e) {
           console.error("Error parsing websocket message", e);
@@ -364,6 +389,12 @@ function App() {
       setSelectedConversation(updatedConversation || null);
     }
   }, [conversations, selectedConversation?.composite_id]);
+
+  useEffect(() => {
+    if (token && (activeView === 'conversations' || activeView === 'userManagement')) {
+        fetchDepartments();
+    }
+  }, [token, activeView, fetchDepartments]);
 
   const handleLogin = (newToken) => {
     localStorage.setItem('admin_token', newToken);
@@ -453,6 +484,55 @@ function App() {
     });
   };
 
+  const handleReopenThread = (compositeId) => {
+    const conversation = conversations.find(c => c.composite_id === compositeId);
+    
+    if (conversation) {
+        const userMessages = (conversation.messages || []).filter(m => m.sender === 'user');
+        let lastMessageDate = null;
+
+        if (userMessages.length > 0) {
+            lastMessageDate = new Date(userMessages[userMessages.length - 1].timestamp);
+        } else if (conversation.last_updated) {
+            lastMessageDate = new Date(conversation.last_updated);
+        }
+
+        if (lastMessageDate) {
+            const now = new Date();
+            const diffHours = (now - lastMessageDate) / (1000 * 60 * 60);
+
+            if (diffHours > 24) {
+                setModalState({
+                  isOpen: true,
+                  isAlert: true,
+                  message: 'Já se passaram 24h desde a última conversa recebida pelo cliente. Não é possível reabrir essa conversa.',
+                  onConfirm: null
+                });
+                return;
+            }
+        }
+    }
+
+    setModalState({
+      isOpen: true,
+      message: 'Tem certeza que deseja reabrir esta conversa para enviar uma mensagem ao cliente?',
+      onConfirm: () => handleApiCall(
+        `${apiBaseUrl}/conversations/${compositeId}/reopen`,
+        { method: 'POST' }
+      ),
+    });
+  };
+
+  // DYNAMICALLY CALCULATE if any needs attention so it perfectly matches the real state
+  const anyNeedsAttention = conversations.some(conv => conv.status === 'open' && conv.human_supervision === true);
+
+  const isLatestThread = React.useMemo(() => {
+    if (!selectedConversation) return false;
+    const allConvsForPhone = conversations.filter(c => c.phone_number === selectedConversation.phone_number);
+    allConvsForPhone.sort((a, b) => new Date(b.last_updated) - new Date(a.last_updated));
+    return allConvsForPhone.length > 0 && allConvsForPhone[0].composite_id === selectedConversation.composite_id;
+  }, [conversations, selectedConversation]);
+
   if (isValidTenant === null) {
       return <div className="flex items-center justify-center h-screen bg-gray-200">Validando cliente...</div>;
   }
@@ -478,25 +558,31 @@ function App() {
         isOpen={modalState.isOpen}
         onClose={() => setModalState({ ...modalState, isOpen: false })}
         onConfirm={() => {
-          modalState.onConfirm();
+          if (modalState.onConfirm) {
+            modalState.onConfirm();
+          }
           setModalState({ ...modalState, isOpen: false });
         }}
         message={modalState.message}
+        isAlert={modalState.isAlert}
       />
       <div className="w-full h-full flex shadow-lg">
-        <ConversationList
-          conversations={conversations}
-          onSelect={handleSelectConversation}
-          selectedId={selectedConversation?.composite_id}
-          onLogout={handleLogout}
-          anyNeedsAttention={anyNeedsAttention}
-          isAdmin={currentUser.role === 'Admin'}
-          onShowUserManagement={() => setActiveView('userManagement')}
-          onShowClientConfigs={() => setActiveView('clientConfigurations')}
-          onShowConversations={() => setActiveView('conversations')}
-          currentUser={currentUser}
-          onLoadMore={loadMoreConversations}
-        />
+        {activeView !== 'dashboard' && (
+          <ConversationList
+            conversations={conversations}
+            onSelect={handleSelectConversation}
+            selectedId={selectedConversation?.composite_id}
+            onLogout={handleLogout}
+            anyNeedsAttention={anyNeedsAttention}
+            isAdmin={currentUser.role === 'Admin'}
+            onShowUserManagement={() => setActiveView('userManagement')}
+            onShowClientConfigs={() => setActiveView('clientConfigurations')}
+            onShowDashboard={() => setActiveView('dashboard')}
+            onShowConversations={() => setActiveView('conversations')}
+            currentUser={currentUser}
+            onLoadMore={loadMoreConversations}
+          />
+        )}
 
         {activeView === 'conversations' && (
             <ChatWindow
@@ -505,7 +591,10 @@ function App() {
                 onMarkAsSolved={handleMarkAsSolved}
                 onInitiateTransfer={handleUpdateSupervisionType}
                 onTakeOver={handleTakeOverConversation}
+                onReopenThread={handleReopenThread}
                 currentUser={currentUser}
+                departments={departments}
+                isLatestThread={isLatestThread}
             />
         )}
 
@@ -515,6 +604,7 @@ function App() {
                 apiBaseUrl={apiBaseUrl}
                 onAction={(message, onConfirm) => setModalState({ isOpen: true, message, onConfirm })}
                 currentUser={currentUser}
+                departments={departments}
             />
         )}
 
@@ -523,6 +613,15 @@ function App() {
                 token={token}
                 apiBaseUrl={apiBaseUrl}
                 onClose={() => setActiveView('conversations')}
+                onAction={(message, onConfirm) => setModalState({ isOpen: true, message, onConfirm })}
+            />
+        )}
+
+        {activeView === 'dashboard' && currentUser.role === 'Admin' && (
+            <Dashboard 
+                onClose={() => setActiveView('conversations')} 
+                apiBaseUrl={apiBaseUrl} 
+                token={token} 
             />
         )}
       </div>

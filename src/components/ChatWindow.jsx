@@ -13,6 +13,7 @@ const SolvedIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" width="24" he
 const TakeOverIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6 text-gray-500 hover:text-blue-500" title="Falar diretamente com o cliente."><path d="M3 18v-6a9 9 0 0 1 18 0v6"></path><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"></path></svg> );
 const PaperclipIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg> );
 const DownloadIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5 mr-2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg> );
+const PhoneIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6 text-gray-500 hover:text-green-500" title="Reabrir conversa"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg> );
 
 // --- Media Renderer Component ---
 const MediaRenderer = ({ msg }) => {
@@ -30,13 +31,12 @@ const MediaRenderer = ({ msg }) => {
     }
 };
 
-export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved, onInitiateTransfer, onTakeOver, currentUser }) {
+export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved, onInitiateTransfer, onTakeOver, onReopenThread, currentUser, departments = [], isLatestThread = false }) {
   const [editorHtml, setEditorHtml] = useState('');
   const [attachedFile, setAttachedFile] = useState(null);
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
   const quillRef = useRef(null);
-  const allSupervisionTypes = ["Social", "Administração", "Esporte, Cultura e Artes"];
 
   // --- TURNDOWN SERVICE SETUP ---
   const turndownService = useMemo(() => {
@@ -164,7 +164,8 @@ export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved
 
   const needsAttention = conversation.status === 'open' && conversation.human_supervision;
   let lastMessageDate = null;
-  const availableTypes = allSupervisionTypes.filter( (type) => type !== conversation.human_supervision_type );
+  const safeDepartments = departments.map(dep => typeof dep === 'object' ? dep.name : dep);
+  const availableTypes = safeDepartments.filter( (type) => type !== conversation.human_supervision_type );
   const isInputDisabled = conversation.status !== 'open' || !conversation.human_supervision;
 
   return (
@@ -199,7 +200,16 @@ export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved
                   <button onClick={() => onMarkAsSolved(conversation.composite_id)} title="Marcar como Resolvido"><SolvedIcon /></button>
                 </>
               ) : ( <button onClick={() => onTakeOver(conversation.composite_id)} title="Assumir conversa e desativar o bot"><TakeOverIcon /></button> )
-            ) : ( <span className="text-xs font-semibold text-gray-500 italic">Conversa Encerrada</span> )}
+            ) : ( 
+              <>
+                <span className="text-xs font-semibold text-gray-500 italic">Conversa Encerrada</span>
+                {isLatestThread && (
+                  <button onClick={() => onReopenThread(conversation.composite_id)} title="Reabrir Conversa">
+                    <PhoneIcon />
+                  </button>
+                )}
+              </>
+            )}
         </div>
       </header>
 
@@ -217,8 +227,8 @@ export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved
 
             const isUserMessage = msg.sender === 'user';
             const isBotMessage = msg.sender === 'bot';
-            const justification = isUserMessage ? 'justify-end' : 'justify-start';
-            const nameAlignment = isUserMessage ? 'text-right mr-2' : 'text-left';
+            const justification = isUserMessage ? 'justify-start' : 'justify-end';
+            const nameAlignment = isUserMessage ? 'text-left self-start' : 'text-right self-end';
             let senderName = msg.sender === 'user'
                 ? (conversation.user_name || 'Cliente')
                 : msg.sender === 'bot' ? 'Indaiatuba IA' : msg.sender;
@@ -249,7 +259,7 @@ export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved
                 {dateDivider}
                 <div className={`flex ${justification}`}>
                     <div className="flex flex-col max-w-lg">
-                        {senderName && ( <span className={`text-xs text-gray-700 font-bold capitalize ${nameAlignment} ${bgColor} border border-gray-200 rounded-t-lg px-2 py-1 self-start`}>{senderName}</span> )}
+                        {senderName && ( <span className={`text-xs text-gray-700 font-bold capitalize ${nameAlignment} ${bgColor} border border-gray-200 rounded-t-lg px-2 py-1`}>{senderName}</span> )}
                         <div className={`rounded-xl px-4 py-2 shadow-md ${bgColor} text-gray-800 ${senderName ? 'rounded-t-none' : ''}`}>
                             <div className="flex flex-col">
                                 {msg.media_url && <MediaRenderer msg={msg} />}
