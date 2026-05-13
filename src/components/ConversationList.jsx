@@ -70,7 +70,7 @@ const normalizeLastMessage = (message) => {
 };
 
 // Added onLoadMore to the props
-export default function ConversationList({ conversations, onSelect, selectedId, onLogout, anyNeedsAttention, isAdmin, isDoctor, onShowUserManagement, onShowClientConfigs, onShowDashboard, onShowConversations, onShowCalendar, currentUser, onLoadMore }) {
+export default function ConversationList({ conversations, onSelect, selectedId, onLogout, anyNeedsAttention, isAdmin, isDoctor, onShowUserManagement, onShowClientConfigs, onShowDashboard, onShowConversations, onShowCalendar, onShowAdminCalendar, currentUser, onLoadMore }) {
   const [searchQuery, setSearchQuery] = useState('');
 
   // Detect scroll reaching the bottom
@@ -123,6 +123,9 @@ export default function ConversationList({ conversations, onSelect, selectedId, 
             )}
             {isAdmin && (
                 <>
+                    <button onClick={onShowAdminCalendar} title="Agenda Unificada" className="text-gray-500 hover:text-blue-500 transition-colors">
+                        <CalendarIcon />
+                    </button>
                     <button onClick={onShowDashboard} title="Dashboard" className="text-gray-500 hover:text-blue-500 transition-colors">
                         <DashboardIcon />
                     </button>

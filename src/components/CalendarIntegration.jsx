@@ -8,7 +8,8 @@ export default function CalendarIntegration({ currentUser, apiBaseUrl, token }) 
         setIsLoading(true);
         setError(null);
         try {
-            const response = await fetch(`${apiBaseUrl}/calendar/auth/google/url`, {
+            const redirectUri = encodeURIComponent(`${window.location.origin}/calendar/callback`);
+            const response = await fetch(`${apiBaseUrl}/calendar/auth/google/url?redirect_uri=${redirectUri}`, {
                 headers: {
                     'Authorization': `Bearer ${token}`
                 }

@@ -12,6 +12,7 @@ import ClientConfigurations from './components/ClientConfigurations.jsx';
 import Dashboard from './components/Dashboard.jsx';
 import CalendarIntegration from './components/CalendarIntegration.jsx';
 import OAuthCallback from './components/OAuthCallback.jsx';
+import AdminCalendarView from './components/AdminCalendarView.jsx';
 
 // Logic to determine WebSocket protocol
 const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -607,6 +608,7 @@ function App() {
                 onShowDashboard={() => setActiveView('dashboard')}
                 onShowConversations={() => setActiveView('conversations')}
                 onShowCalendar={() => setActiveView('calendar')}
+                onShowAdminCalendar={() => setActiveView('adminCalendar')}
                 currentUser={currentUser}
                 onLoadMore={loadMoreConversations}
               />
@@ -656,6 +658,14 @@ function App() {
 
             {activeView === 'calendar' && (
                 <CalendarIntegration
+                    currentUser={currentUser}
+                    apiBaseUrl={apiBaseUrl}
+                    token={token}
+                />
+            )}
+
+            {activeView === 'adminCalendar' && currentUser.role === 'Admin' && (
+                <AdminCalendarView
                     currentUser={currentUser}
                     apiBaseUrl={apiBaseUrl}
                     token={token}

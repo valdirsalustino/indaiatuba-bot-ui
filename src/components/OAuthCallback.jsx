@@ -18,15 +18,14 @@ export default function OAuthCallback({ apiBaseUrl, token }) {
 
         const handleAuth = async () => {
             try {
-                // The backend endpoint extracts tenant from the URL, so we can use the generic apiBaseUrl
-                // However, state might contain "tenant:username", so we could also parse it
+                const redirect_uri = `${window.location.origin}/calendar/callback`;
                 const response = await fetch(`${apiBaseUrl}/calendar/auth/google/callback`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                         'Authorization': `Bearer ${token}`
                     },
-                    body: JSON.stringify({ code })
+                    body: JSON.stringify({ code, redirect_uri })
                 });
 
                 if (!response.ok) {
