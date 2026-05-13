@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { jwtDecode } from 'jwt-decode';
+import { Routes, Route } from 'react-router-dom';
 import Login from './components/Login.jsx';
 import ConversationList from './components/ConversationList.jsx';
 import ChatWindow from './components/ChatWindow.jsx';
@@ -9,6 +10,8 @@ import ConfirmationModal from './components/ConfirmationModal.jsx';
 import UserManagement from './components/UserManagement.jsx';
 import ClientConfigurations from './components/ClientConfigurations.jsx';
 import Dashboard from './components/Dashboard.jsx';
+import CalendarIntegration from './components/CalendarIntegration.jsx';
+import OAuthCallback from './components/OAuthCallback.jsx';
 
 // Logic to determine WebSocket protocol
 const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -564,84 +567,104 @@ function App() {
   }
 
   if (!token || !currentUser) {
-    return <Login onLogin={handleLogin} apiBaseUrl={apiBaseUrl} />;
+    return (
+      <Routes>
+        <Route path="/calendar/callback" element={<OAuthCallback apiBaseUrl={apiBaseUrl} token={null} />} />
+        <Route path="*" element={<Login onLogin={handleLogin} apiBaseUrl={apiBaseUrl} />} />
+      </Routes>
+    );
   }
 
   return (
-    <div className="h-screen w-screen bg-gray-200 flex font-sans antialiased text-gray-800">
-      <ConfirmationModal
-        isOpen={modalState.isOpen}
-        onClose={() => setModalState({ ...modalState, isOpen: false })}
-        onConfirm={() => {
-          if (modalState.onConfirm) {
-            modalState.onConfirm();
-          }
-          setModalState({ ...modalState, isOpen: false });
-        }}
-        message={modalState.message}
-        isAlert={modalState.isAlert}
-      />
-      <div className="w-full h-full flex shadow-lg">
-        {activeView !== 'dashboard' && (
-          <ConversationList
-            conversations={conversations}
-            onSelect={handleSelectConversation}
-            selectedId={selectedConversation?.composite_id}
-            onLogout={handleLogout}
-            anyNeedsAttention={anyNeedsAttention}
-            isAdmin={currentUser.role === 'Admin'}
-            onShowUserManagement={() => setActiveView('userManagement')}
-            onShowClientConfigs={() => setActiveView('clientConfigurations')}
-            onShowDashboard={() => setActiveView('dashboard')}
-            onShowConversations={() => setActiveView('conversations')}
-            currentUser={currentUser}
-            onLoadMore={loadMoreConversations}
+    <Routes>
+      <Route path="/calendar/callback" element={<OAuthCallback apiBaseUrl={apiBaseUrl} token={token} />} />
+      <Route path="*" element={
+        <div className="h-screen w-screen bg-gray-200 flex font-sans antialiased text-gray-800">
+          <ConfirmationModal
+            isOpen={modalState.isOpen}
+            onClose={() => setModalState({ ...modalState, isOpen: false })}
+            onConfirm={() => {
+              if (modalState.onConfirm) {
+                modalState.onConfirm();
+              }
+              setModalState({ ...modalState, isOpen: false });
+            }}
+            message={modalState.message}
+            isAlert={modalState.isAlert}
           />
-        )}
-
-        {activeView === 'conversations' && (
-            <ChatWindow
-                conversation={selectedConversation}
-                onSendMessage={handleSendMessage}
-                onMarkAsSolved={handleMarkAsSolved}
-                onInitiateTransfer={handleUpdateSupervisionType}
-                onTakeOver={handleTakeOverConversation}
-                onReopenThread={handleReopenThread}
+          <div className="w-full h-full flex shadow-lg">
+            {activeView !== 'dashboard' && (
+              <ConversationList
+                conversations={conversations}
+                onSelect={handleSelectConversation}
+                selectedId={selectedConversation?.composite_id}
+                onLogout={handleLogout}
+                anyNeedsAttention={anyNeedsAttention}
+                isAdmin={currentUser.role === 'Admin'}
+                isDoctor={currentUser.role === 'Médico'}
+                onShowUserManagement={() => setActiveView('userManagement')}
+                onShowClientConfigs={() => setActiveView('clientConfigurations')}
+                onShowDashboard={() => setActiveView('dashboard')}
+                onShowConversations={() => setActiveView('conversations')}
+                onShowCalendar={() => setActiveView('calendar')}
                 currentUser={currentUser}
-                departments={departments}
-                isLatestThread={isLatestThread}
-                clientName={clientName}
-            />
-        )}
+                onLoadMore={loadMoreConversations}
+              />
+            )}
 
-        {activeView === 'userManagement' && currentUser.role === 'Admin' && (
-            <UserManagement
-                token={token}
-                apiBaseUrl={apiBaseUrl}
-                onAction={(message, onConfirm) => setModalState({ isOpen: true, message, onConfirm })}
-                currentUser={currentUser}
-                departments={departments}
-            />
-        )}
+            {activeView === 'conversations' && (
+                <ChatWindow
+                    conversation={selectedConversation}
+                    onSendMessage={handleSendMessage}
+                    onMarkAsSolved={handleMarkAsSolved}
+                    onInitiateTransfer={handleUpdateSupervisionType}
+                    onTakeOver={handleTakeOverConversation}
+                    onReopenThread={handleReopenThread}
+                    currentUser={currentUser}
+                    departments={departments}
+                    isLatestThread={isLatestThread}
+                    clientName={clientName}
+                />
+            )}
 
-        {activeView === 'clientConfigurations' && currentUser.role === 'Admin' && (
-            <ClientConfigurations
-                token={token}
-                apiBaseUrl={apiBaseUrl}
-                onClose={() => setActiveView('conversations')}
-                onAction={(message, onConfirm) => setModalState({ isOpen: true, message, onConfirm })}
-            />
-        )}
+            {activeView === 'userManagement' && currentUser.role === 'Admin' && (
+                <UserManagement
+                    token={token}
+                    apiBaseUrl={apiBaseUrl}
+                    onAction={(message, onConfirm) => setModalState({ isOpen: true, message, onConfirm })}
+                    currentUser={currentUser}
+                    departments={departments}
+                />
+            )}
 
-        {activeView === 'dashboard' && currentUser.role === 'Admin' && (
-            <Dashboard 
-                onClose={() => setActiveView('conversations')} 
-                apiBaseUrl={apiBaseUrl} 
-                token={token} 
-            />
-        )}
-      </div>
-    </div>
+            {activeView === 'clientConfigurations' && currentUser.role === 'Admin' && (
+                <ClientConfigurations
+                    token={token}
+                    apiBaseUrl={apiBaseUrl}
+                    onClose={() => setActiveView('conversations')}
+                    onAction={(message, onConfirm) => setModalState({ isOpen: true, message, onConfirm })}
+                />
+            )}
+
+            {activeView === 'dashboard' && currentUser.role === 'Admin' && (
+                <Dashboard 
+                    onClose={() => setActiveView('conversations')} 
+                    apiBaseUrl={apiBaseUrl} 
+                    token={token} 
+                />
+            )}
+
+            {activeView === 'calendar' && (
+                <CalendarIntegration
+                    currentUser={currentUser}
+                    apiBaseUrl={apiBaseUrl}
+                    token={token}
+                />
+            )}
+          </div>
+        </div>
+      } />
+    </Routes>
   );
 }
 
