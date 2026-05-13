@@ -18,6 +18,11 @@ export default function ClientConfigurations({ apiBaseUrl, token, onAction }) {
     const [welcomeMessage, setWelcomeMessage] = useState('');
     const [originalWelcomeMessage, setOriginalWelcomeMessage] = useState('');
 
+    // --- Industry States ---
+    const [industry, setIndustry] = useState('Clubes');
+    const [originalIndustry, setOriginalIndustry] = useState('Clubes');
+    const [availableIndustries, setAvailableIndustries] = useState(['Clubes']);
+
     // --- Topics States ---
     const [topics, setTopics] = useState([]);
     const [topicsError, setTopicsError] = useState('');
@@ -141,6 +146,27 @@ export default function ClientConfigurations({ apiBaseUrl, token, onAction }) {
                         throw new Error(errorData.detail || `Erro ao carregar mensagem de saudação: Status ${welcomeResponse.status}`);
                     } else {
                         setWelcomeMessage('');
+                    }
+
+                    const availableIndUrl = `/api/available-industries`;
+                    const availableIndResponse = await fetch(availableIndUrl, {
+                        method: 'GET',
+                        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
+                    });
+                    if (availableIndResponse.ok) {
+                        const indData = await availableIndResponse.json();
+                        setAvailableIndustries(indData || ['Clubes']);
+                    }
+
+                    const industryUrl = `${apiBaseUrl}/industry`;
+                    const industryResponse = await fetch(industryUrl, {
+                        method: 'GET',
+                        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
+                    });
+                    if (industryResponse.ok) {
+                        const indData = await industryResponse.json();
+                        setIndustry(indData.industry || 'Clubes');
+                        setOriginalIndustry(indData.industry || 'Clubes');
                     }
 
                     const topicsUrl = `${apiBaseUrl}/topic-classification`;
@@ -337,6 +363,21 @@ export default function ClientConfigurations({ apiBaseUrl, token, onAction }) {
                     throw new Error(errorData.detail || `Erro ao salvar Nome do Cliente: Status ${infoResponse.status}`);
                 }
                 setOriginalClientInfo({ name: clientName, website: website });
+            }
+
+            if (industry !== originalIndustry) {
+                const industryUrl = `${apiBaseUrl}/industry`;
+                const industryResponse = await fetch(industryUrl, {
+                    method: 'PUT',
+                    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ industry })
+                });
+
+                if (!industryResponse.ok) {
+                    const errorData = await industryResponse.json().catch(() => ({}));
+                    throw new Error(errorData.detail || `Erro ao salvar indústria: Status ${industryResponse.status}`);
+                }
+                setOriginalIndustry(industry);
             }
 
             if (systemPrompt !== originalSystemPrompt) {
@@ -851,6 +892,20 @@ export default function ClientConfigurations({ apiBaseUrl, token, onAction }) {
                         {clientPromptError && <p className="text-red-500">{clientPromptError}</p>}
                         {!loadingClientPrompt && (
                             <div className="space-y-6">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Indústria (Tipo de Negócio)</label>
+                                    <select
+                                        value={industry}
+                                        onChange={(e) => setIndustry(e.target.value)}
+                                        disabled={!isEditingClientPrompt}
+                                        className={`w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 ${!isEditingClientPrompt ? 'bg-gray-100' : ''}`}
+                                    >
+                                        {availableIndustries.map((ind, idx) => (
+                                            <option key={idx} value={ind}>{ind}</option>
+                                        ))}
+                                    </select>
+                                </div>
+
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">Nome do Cliente</label>
                                     <input
