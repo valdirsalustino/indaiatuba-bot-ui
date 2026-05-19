@@ -117,26 +117,35 @@ export default function ConversationList({ conversations, onSelect, selectedId, 
         </div>
         <div className="flex items-center space-x-4">
             {isDoctor && isCalendarEnabled && (
-                <button onClick={onShowCalendar} title="Calendar Settings" className="text-gray-500 hover:text-blue-500 transition-colors">
-                    <CalendarIcon />
-                </button>
+                <>
+                    <button onClick={onShowAdminCalendar} title="Minha Agenda" className="text-gray-500 hover:text-blue-500 transition-colors">
+                        <CalendarIcon />
+                    </button>
+                    <button onClick={onShowCalendar} title="Calendar Settings" className="text-gray-500 hover:text-blue-500 transition-colors">
+                        <SettingsIcon />
+                    </button>
+                </>
             )}
-            {isAdmin && (
+            {(isAdmin || currentUser.role === 'Secretaria') && (
                 <>
                     {isCalendarEnabled && (
                         <button onClick={onShowAdminCalendar} title="Agenda Unificada" className="text-gray-500 hover:text-blue-500 transition-colors">
                             <CalendarIcon />
                         </button>
                     )}
-                    <button onClick={onShowDashboard} title="Dashboard" className="text-gray-500 hover:text-blue-500 transition-colors">
-                        <DashboardIcon />
-                    </button>
-                    <button onClick={onShowClientConfigs} title="Client Configurations" className="text-gray-500 hover:text-blue-500 transition-colors">
-                        <SettingsIcon />
-                    </button>
-                    <button onClick={onShowUserManagement} title="Manage Users" className="text-gray-500 hover:text-blue-500 transition-colors">
-                        <ManageUsersIcon />
-                    </button>
+                    {isAdmin && (
+                        <>
+                            <button onClick={onShowDashboard} title="Dashboard" className="text-gray-500 hover:text-blue-500 transition-colors">
+                                <DashboardIcon />
+                            </button>
+                            <button onClick={onShowClientConfigs} title="Client Configurations" className="text-gray-500 hover:text-blue-500 transition-colors">
+                                <SettingsIcon />
+                            </button>
+                            <button onClick={onShowUserManagement} title="Manage Users" className="text-gray-500 hover:text-blue-500 transition-colors">
+                                <ManageUsersIcon />
+                            </button>
+                        </>
+                    )}
                 </>
             )}
             <button onClick={onLogout} title="Logout" className="text-gray-500 hover:text-red-500 transition-colors">

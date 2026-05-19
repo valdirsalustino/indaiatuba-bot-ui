@@ -685,7 +685,7 @@ function App() {
                 />
             )}
 
-            {activeView === 'adminCalendar' && currentUser.role === 'Admin' && isCalendarEnabled && (
+            {activeView === 'adminCalendar' && ['Admin', 'Secretaria', 'Médico'].includes(currentUser.role) && isCalendarEnabled && (
                 <AdminCalendarView
                     currentUser={currentUser}
                     apiBaseUrl={apiBaseUrl}

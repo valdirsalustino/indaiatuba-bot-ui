@@ -48,6 +48,11 @@ export default function AdminCalendarView({ token, apiBaseUrl, currentUser }) {
 
     // Fetch doctors (users with role 'Médico')
     const fetchDoctors = useCallback(async () => {
+        if (currentUser.role === 'Médico') {
+            setDoctors([{ username: currentUser.username, name: currentUser.name || currentUser.username, role: 'Médico' }]);
+            return;
+        }
+        
         try {
             const response = await fetch(`${apiBaseUrl}/users`, {
                 headers: { 'Authorization': `Bearer ${token}` }
@@ -60,7 +65,7 @@ export default function AdminCalendarView({ token, apiBaseUrl, currentUser }) {
         } catch (err) {
             console.error("Failed to fetch doctors:", err);
         }
-    }, [apiBaseUrl, token]);
+    }, [apiBaseUrl, token, currentUser]);
 
     // Fetch calendar events
     const fetchEvents = useCallback(async () => {
