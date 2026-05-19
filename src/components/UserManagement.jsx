@@ -23,14 +23,81 @@ const CancelIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
 );
 
+const ClockIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
+    <circle cx="12" cy="12" r="10"></circle>
+    <polyline points="12 6 12 12 16 14"></polyline>
+  </svg>
+);
 
+const getDefaultWorkingHours = () => ({
+  Monday: { active: false, start_time: "09:00", end_time: "17:00" },
+  Tuesday: { active: false, start_time: "09:00", end_time: "17:00" },
+  Wednesday: { active: false, start_time: "09:00", end_time: "17:00" },
+  Thursday: { active: false, start_time: "09:00", end_time: "17:00" },
+  Friday: { active: false, start_time: "09:00", end_time: "17:00" },
+  Saturday: { active: false, start_time: "09:00", end_time: "13:00" },
+  Sunday: { active: false, start_time: "09:00", end_time: "13:00" },
+});
+
+const WorkingHoursEditor = ({ workingHours, onChange }) => {
+  const daysInPortuguese = {
+    Monday: 'Segunda-feira',
+    Tuesday: 'Terça-feira',
+    Wednesday: 'Quarta-feira',
+    Thursday: 'Quinta-feira',
+    Friday: 'Sexta-feira',
+    Saturday: 'Sábado',
+    Sunday: 'Domingo'
+  };
+
+  return (
+    <div className="p-4 bg-gray-50 border rounded-md">
+      <h4 className="font-semibold text-gray-700 mb-3">Horário de Atendimento</h4>
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-y-4 gap-x-6">
+        {Object.entries(workingHours || getDefaultWorkingHours()).map(([day, schedule]) => (
+          <div key={day} className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center space-x-2 min-w-[130px]">
+              <input 
+                type="checkbox" 
+                checked={schedule.active}
+                onChange={(e) => onChange({ ...workingHours, [day]: { ...schedule, active: e.target.checked } })}
+                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              />
+              <span className="text-sm text-gray-700 font-medium">{daysInPortuguese[day]}</span>
+            </div>
+            {schedule.active && (
+              <div className="flex items-center space-x-2 bg-white px-2 py-1 rounded border shadow-sm">
+                <input 
+                  type="time" 
+                  value={schedule.start_time}
+                  onChange={(e) => onChange({ ...workingHours, [day]: { ...schedule, start_time: e.target.value } })}
+                  className="text-sm border-none bg-transparent p-0 focus:ring-0 w-[70px]"
+                />
+                <span className="text-sm text-gray-400">até</span>
+                <input 
+                  type="time" 
+                  value={schedule.end_time}
+                  onChange={(e) => onChange({ ...workingHours, [day]: { ...schedule, end_time: e.target.value } })}
+                  className="text-sm border-none bg-transparent p-0 focus:ring-0 w-[70px]"
+                />
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
 export default function UserManagement({ token, apiBaseUrl, onAction, currentUser, departments = [] }) {
   const [message, setMessage] = useState('');
   const [isError, setIsError] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [users, setUsers] = useState([]);
   const [isAdding, setIsAdding] = useState(false);
-  const [newUser, setNewUser] = useState({ username: '', name: '', role: '' });
+  const [newUser, setNewUser] = useState({ username: '', name: '', role: '', working_hours: getDefaultWorkingHours() });
+  const [editingWorkingHoursFor, setEditingWorkingHoursFor] = useState(null);
+  const [editingWorkingHours, setEditingWorkingHours] = useState(null);
 
   const fetchUsers = async () => {
     try {
@@ -67,13 +134,18 @@ export default function UserManagement({ token, apiBaseUrl, onAction, currentUse
     }
 
     try {
+      const payload = { ...newUser };
+      if (payload.role !== 'Médico') {
+          delete payload.working_hours;
+      }
+
       const response = await fetch(`${apiBaseUrl}/users`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
-        body: JSON.stringify(newUser),
+        body: JSON.stringify(payload),
       });
       const data = await response.json();
       if (!response.ok) {
@@ -81,7 +153,7 @@ export default function UserManagement({ token, apiBaseUrl, onAction, currentUse
       }
       setMessage(`User "${data.username}" created successfully! Password: ${data.temporary_password}`);
       setIsAdding(false);
-      setNewUser({ username: '', name: '', role: '' });
+      setNewUser({ username: '', name: '', role: '', working_hours: getDefaultWorkingHours() });
       fetchUsers(); // Refresh the user list
     } catch (err) {
       setMessage(err.message);
@@ -171,40 +243,90 @@ export default function UserManagement({ token, apiBaseUrl, onAction, currentUse
                       {users.map(user => {
                         const isCurrentUser = user.username === currentUser.username;
                         return (
-                          <tr key={user.username} className={`bg-white border-b ${isCurrentUser ? 'bg-gray-100' : 'hover:bg-gray-50'}`}>
+                          <React.Fragment key={user.username}>
+                          <tr className={`bg-white border-b ${isCurrentUser ? 'bg-gray-100' : 'hover:bg-gray-50'}`}>
                               <td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap">{user.username}</td>
                               <td className="px-6 py-4">{user.name}</td>
                               <td className="px-6 py-4">
-                                <select
-                                    value={user.role}
-                                    onChange={(e) => handleUpdateUser(user.username, { role: e.target.value })}
-                                    className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-1.5"
-                                    disabled={isCurrentUser}
-                                    onFocus={(e) => e.target.defaultValue = e.target.value} // Store original value on focus
-                                    onBlur={(e) => { // Revert if no confirmation
-                                        if (document.querySelector('.fixed.inset-0.bg-black')) {
-                                          e.target.value = e.target.defaultValue;
-                                        }
-                                    }}
-                                >
-                                    {departments.map(dep => {
-                                        const depName = typeof dep === 'object' ? dep.name : dep;
-                                        return <option key={depName} value={depName}>{depName}</option>;
-                                    })}
-                                    <option value="Admin">Admin</option>
-                                </select>
+                                <div className="flex items-center space-x-3">
+                                  <select
+                                      value={user.role}
+                                      onChange={(e) => handleUpdateUser(user.username, { role: e.target.value })}
+                                      className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-1.5"
+                                      disabled={isCurrentUser}
+                                      onFocus={(e) => e.target.defaultValue = e.target.value} // Store original value on focus
+                                      onBlur={(e) => { // Revert if no confirmation
+                                          if (document.querySelector('.fixed.inset-0.bg-black')) {
+                                            e.target.value = e.target.defaultValue;
+                                          }
+                                      }}
+                                  >
+                                      {departments.map(dep => {
+                                          const depName = typeof dep === 'object' ? dep.name : dep;
+                                          return <option key={depName} value={depName}>{depName}</option>;
+                                      })}
+                                      <option value="Admin">Admin</option>
+                                  </select>
+                                  {user.role === 'Médico' && (
+                                      <button 
+                                          onClick={() => {
+                                              if (editingWorkingHoursFor === user.username) {
+                                                  setEditingWorkingHoursFor(null);
+                                              } else {
+                                                  setEditingWorkingHours(user.working_hours || getDefaultWorkingHours());
+                                                  setEditingWorkingHoursFor(user.username);
+                                              }
+                                          }} 
+                                          className="text-blue-500 hover:text-blue-700 shrink-0"
+                                          title="Editar Horário de Atendimento"
+                                      >
+                                          <ClockIcon />
+                                      </button>
+                                  )}
+                                </div>
                               </td>
                               <td className="px-6 py-4 text-right">
-                                  {!isCurrentUser && (
-                                    <button onClick={() => handleDelete(user.username)} className="text-red-500 hover:text-red-700">
-                                        <TrashIcon />
-                                    </button>
-                                  )}
+                                  <div className="flex items-center justify-end space-x-2">
+                                      {!isCurrentUser && (
+                                        <button onClick={() => handleDelete(user.username)} className="text-red-500 hover:text-red-700" title="Remover Usuário">
+                                            <TrashIcon />
+                                        </button>
+                                      )}
+                                  </div>
                               </td>
                           </tr>
+                          {editingWorkingHoursFor === user.username && (
+                              <tr key={`${user.username}-hours`} className="bg-gray-50 border-b">
+                                  <td colSpan="4" className="px-6 py-4">
+                                      <WorkingHoursEditor 
+                                          workingHours={editingWorkingHours} 
+                                          onChange={setEditingWorkingHours} 
+                                      />
+                                      <div className="flex justify-end mt-4 space-x-2">
+                                          <button 
+                                              onClick={() => setEditingWorkingHoursFor(null)} 
+                                              className="px-4 py-2 text-sm text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 transition-colors"
+                                          >
+                                              Cancelar
+                                          </button>
+                                          <button 
+                                              onClick={() => {
+                                                  handleUpdateUser(user.username, { working_hours: editingWorkingHours });
+                                                  setEditingWorkingHoursFor(null);
+                                              }} 
+                                              className="px-4 py-2 text-sm text-white bg-blue-600 rounded-md hover:bg-blue-700 transition-colors"
+                                          >
+                                              Salvar Horários
+                                          </button>
+                                      </div>
+                                  </td>
+                              </tr>
+                          )}
+                          </React.Fragment>
                         )
                       })}
                       {isAdding && (
+                          <React.Fragment>
                           <tr className="bg-blue-50 border-b">
                               <td className="px-6 py-4">
                                   <input
@@ -247,6 +369,17 @@ export default function UserManagement({ token, apiBaseUrl, onAction, currentUse
                                   </button>
                               </td>
                           </tr>
+                          {newUser.role === 'Médico' && (
+                              <tr className="bg-blue-50 border-b">
+                                  <td colSpan="4" className="px-6 py-4">
+                                      <WorkingHoursEditor 
+                                          workingHours={newUser.working_hours} 
+                                          onChange={(wh) => setNewUser({ ...newUser, working_hours: wh })} 
+                                      />
+                                  </td>
+                              </tr>
+                          )}
+                          </React.Fragment>
                       )}
                   </tbody>
               </table>
