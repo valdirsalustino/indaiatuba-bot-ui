@@ -72,6 +72,10 @@ function App() {
   const [activeView, setActiveView] = useState('conversations');
   const [departments, setDepartments] = useState([]);
   const [clientName, setClientName] = useState('');
+  const [industry, setIndustry] = useState(null);
+
+  // Configuration for which industries show the calendar
+  const CALENDAR_ENABLED_INDUSTRIES = ["Hospitais e Clínicas"];
 
   // Pagination States
   const [skip, setSkip] = useState(0);
@@ -212,6 +216,19 @@ function App() {
         }
     } catch (error) {
         console.error("Failed to fetch client info:", error);
+    }
+  }, [token, apiBaseUrl, authFetch]);
+
+  const fetchIndustry = useCallback(async () => {
+    if (!token) return;
+    try {
+        const response = await authFetch(`${apiBaseUrl}/industry`);
+        if (response.ok) {
+            const data = await response.json();
+            setIndustry(data.industry);
+        }
+    } catch (error) {
+        console.error("Failed to fetch industry:", error);
     }
   }, [token, apiBaseUrl, authFetch]);
 
@@ -412,8 +429,9 @@ function App() {
     if (token && (activeView === 'conversations' || activeView === 'userManagement')) {
         fetchDepartments();
         fetchClientInfo();
+        fetchIndustry();
     }
-  }, [token, activeView, fetchDepartments, fetchClientInfo]);
+  }, [token, activeView, fetchDepartments, fetchClientInfo, fetchIndustry]);
 
   const handleLogin = (newToken) => {
     localStorage.setItem('admin_token', newToken);
@@ -552,6 +570,8 @@ function App() {
     return allConvsForPhone.length > 0 && allConvsForPhone[0].composite_id === selectedConversation.composite_id;
   }, [conversations, selectedConversation]);
 
+  const isCalendarEnabled = industry ? CALENDAR_ENABLED_INDUSTRIES.includes(industry) : false;
+
   if (isValidTenant === null) {
       return <div className="flex items-center justify-center h-screen bg-gray-200">Validando cliente...</div>;
   }
@@ -603,6 +623,7 @@ function App() {
                 anyNeedsAttention={anyNeedsAttention}
                 isAdmin={currentUser.role === 'Admin'}
                 isDoctor={currentUser.role === 'Médico'}
+                isCalendarEnabled={isCalendarEnabled}
                 onShowUserManagement={() => setActiveView('userManagement')}
                 onShowClientConfigs={() => setActiveView('clientConfigurations')}
                 onShowDashboard={() => setActiveView('dashboard')}
@@ -656,7 +677,7 @@ function App() {
                 />
             )}
 
-            {activeView === 'calendar' && (
+            {activeView === 'calendar' && isCalendarEnabled && (
                 <CalendarIntegration
                     currentUser={currentUser}
                     apiBaseUrl={apiBaseUrl}
@@ -664,7 +685,7 @@ function App() {
                 />
             )}
 
-            {activeView === 'adminCalendar' && currentUser.role === 'Admin' && (
+            {activeView === 'adminCalendar' && currentUser.role === 'Admin' && isCalendarEnabled && (
                 <AdminCalendarView
                     currentUser={currentUser}
                     apiBaseUrl={apiBaseUrl}

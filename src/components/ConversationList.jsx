@@ -70,7 +70,7 @@ const normalizeLastMessage = (message) => {
 };
 
 // Added onLoadMore to the props
-export default function ConversationList({ conversations, onSelect, selectedId, onLogout, anyNeedsAttention, isAdmin, isDoctor, onShowUserManagement, onShowClientConfigs, onShowDashboard, onShowConversations, onShowCalendar, onShowAdminCalendar, currentUser, onLoadMore }) {
+export default function ConversationList({ conversations, onSelect, selectedId, onLogout, anyNeedsAttention, isAdmin, isDoctor, isCalendarEnabled, onShowUserManagement, onShowClientConfigs, onShowDashboard, onShowConversations, onShowCalendar, onShowAdminCalendar, currentUser, onLoadMore }) {
   const [searchQuery, setSearchQuery] = useState('');
 
   // Detect scroll reaching the bottom
@@ -116,16 +116,18 @@ export default function ConversationList({ conversations, onSelect, selectedId, 
             {anyNeedsAttention && <AlertIcon />}
         </div>
         <div className="flex items-center space-x-4">
-            {isDoctor && (
+            {isDoctor && isCalendarEnabled && (
                 <button onClick={onShowCalendar} title="Calendar Settings" className="text-gray-500 hover:text-blue-500 transition-colors">
                     <CalendarIcon />
                 </button>
             )}
             {isAdmin && (
                 <>
-                    <button onClick={onShowAdminCalendar} title="Agenda Unificada" className="text-gray-500 hover:text-blue-500 transition-colors">
-                        <CalendarIcon />
-                    </button>
+                    {isCalendarEnabled && (
+                        <button onClick={onShowAdminCalendar} title="Agenda Unificada" className="text-gray-500 hover:text-blue-500 transition-colors">
+                            <CalendarIcon />
+                        </button>
+                    )}
                     <button onClick={onShowDashboard} title="Dashboard" className="text-gray-500 hover:text-blue-500 transition-colors">
                         <DashboardIcon />
                     </button>
