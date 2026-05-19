@@ -220,7 +220,7 @@ export default function AdminCalendarView({ token, apiBaseUrl, currentUser }) {
             <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between shadow-sm flex-shrink-0">
                 <div>
                     <h1 className="text-2xl font-bold text-gray-800">Agenda Unificada</h1>
-                    <p className="text-sm text-gray-500 mt-1">Gerencie agendamentos de todos os médicos do tenant.</p>
+                    <p className="text-sm text-gray-500 mt-1">Gerencie agendamentos de todos os médicos.</p>
                 </div>
                 
                 {/* Doctor Legend */}
