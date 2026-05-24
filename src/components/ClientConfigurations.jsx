@@ -17,6 +17,13 @@ export default function ClientConfigurations({ apiBaseUrl, token, onAction }) {
     const [originalSystemPrompt, setOriginalSystemPrompt] = useState('');
     const [welcomeMessage, setWelcomeMessage] = useState('');
     const [originalWelcomeMessage, setOriginalWelcomeMessage] = useState('');
+    const [queueWaitingMessage, setQueueWaitingMessage] = useState('');
+    const [originalQueueWaitingMessage, setOriginalQueueWaitingMessage] = useState('');
+
+    // --- Industry States ---
+    const [industry, setIndustry] = useState('Clubes');
+    const [originalIndustry, setOriginalIndustry] = useState('Clubes');
+    const [availableIndustries, setAvailableIndustries] = useState(['Clubes']);
 
     // --- Topics States ---
     const [topics, setTopics] = useState([]);
@@ -141,6 +148,47 @@ export default function ClientConfigurations({ apiBaseUrl, token, onAction }) {
                         throw new Error(errorData.detail || `Erro ao carregar mensagem de saudação: Status ${welcomeResponse.status}`);
                     } else {
                         setWelcomeMessage('');
+                    }
+
+                    const queueUrl = `${apiBaseUrl}/queue-waiting-message`;
+                    const queueResponse = await fetch(queueUrl, {
+                        method: 'GET',
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json'
+                        }
+                    });
+
+                    if (queueResponse.ok) {
+                        const queueData = await queueResponse.json();
+                        setQueueWaitingMessage(queueData.message || '');
+                        setOriginalQueueWaitingMessage(queueData.message || '');
+                    } else if (queueResponse.status !== 404) {
+                        const errorData = await queueResponse.json().catch(() => ({}));
+                        throw new Error(errorData.detail || `Erro ao carregar mensagem da fila de espera: Status ${queueResponse.status}`);
+                    } else {
+                        setQueueWaitingMessage('');
+                    }
+
+                    const availableIndUrl = `/api/available-industries`;
+                    const availableIndResponse = await fetch(availableIndUrl, {
+                        method: 'GET',
+                        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
+                    });
+                    if (availableIndResponse.ok) {
+                        const indData = await availableIndResponse.json();
+                        setAvailableIndustries(indData || ['Clubes']);
+                    }
+
+                    const industryUrl = `${apiBaseUrl}/industry`;
+                    const industryResponse = await fetch(industryUrl, {
+                        method: 'GET',
+                        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
+                    });
+                    if (industryResponse.ok) {
+                        const indData = await industryResponse.json();
+                        setIndustry(indData.industry || 'Clubes');
+                        setOriginalIndustry(indData.industry || 'Clubes');
                     }
 
                     const topicsUrl = `${apiBaseUrl}/topic-classification`;
@@ -339,6 +387,21 @@ export default function ClientConfigurations({ apiBaseUrl, token, onAction }) {
                 setOriginalClientInfo({ name: clientName, website: website });
             }
 
+            if (industry !== originalIndustry) {
+                const industryUrl = `${apiBaseUrl}/industry`;
+                const industryResponse = await fetch(industryUrl, {
+                    method: 'PUT',
+                    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ industry })
+                });
+
+                if (!industryResponse.ok) {
+                    const errorData = await industryResponse.json().catch(() => ({}));
+                    throw new Error(errorData.detail || `Erro ao salvar indústria: Status ${industryResponse.status}`);
+                }
+                setOriginalIndustry(industry);
+            }
+
             if (systemPrompt !== originalSystemPrompt) {
                 const promptUrl = `${apiBaseUrl}/system-prompt`;
                 const promptResponse = await fetch(promptUrl, {
@@ -367,6 +430,21 @@ export default function ClientConfigurations({ apiBaseUrl, token, onAction }) {
                     throw new Error(errorData.detail || `Erro ao salvar mensagem de saudação: Status ${welcomeResponse.status}`);
                 }
                 setOriginalWelcomeMessage(welcomeMessage);
+            }
+
+            if (queueWaitingMessage !== originalQueueWaitingMessage) {
+                const queueUrl = `${apiBaseUrl}/queue-waiting-message`;
+                const queueResponse = await fetch(queueUrl, {
+                    method: 'PUT',
+                    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: queueWaitingMessage })
+                });
+
+                if (!queueResponse.ok) {
+                    const errorData = await queueResponse.json().catch(() => ({}));
+                    throw new Error(errorData.detail || `Erro ao salvar mensagem da fila de espera: Status ${queueResponse.status}`);
+                }
+                setOriginalQueueWaitingMessage(queueWaitingMessage);
             }
 
             setIsEditingClientPrompt(false);
@@ -852,6 +930,20 @@ export default function ClientConfigurations({ apiBaseUrl, token, onAction }) {
                         {!loadingClientPrompt && (
                             <div className="space-y-6">
                                 <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Indústria (Tipo de Negócio)</label>
+                                    <select
+                                        value={industry}
+                                        onChange={(e) => setIndustry(e.target.value)}
+                                        disabled={!isEditingClientPrompt}
+                                        className={`w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 ${!isEditingClientPrompt ? 'bg-gray-100' : ''}`}
+                                    >
+                                        {availableIndustries.map((ind, idx) => (
+                                            <option key={idx} value={ind}>{ind}</option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">Nome do Cliente</label>
                                     <input
                                         type="text"
@@ -882,6 +974,17 @@ export default function ClientConfigurations({ apiBaseUrl, token, onAction }) {
                                         readOnly={!isEditingClientPrompt}
                                         className={`w-full h-32 p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 resize-y overflow-auto ${!isEditingClientPrompt ? 'bg-gray-100' : ''}`}
                                         placeholder="Nenhuma mensagem de saudação."
+                                    />
+                                </div>
+
+                                <div>
+                                    <h4 className="text-lg font-semibold text-gray-700 mb-2">Mensagem da Fila de Espera</h4>
+                                    <textarea
+                                        value={queueWaitingMessage}
+                                        onChange={(e) => setQueueWaitingMessage(e.target.value)}
+                                        readOnly={!isEditingClientPrompt}
+                                        className={`w-full h-32 p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 resize-y overflow-auto ${!isEditingClientPrompt ? 'bg-gray-100' : ''}`}
+                                        placeholder="Nenhuma mensagem da fila de espera."
                                     />
                                 </div>
                                 
