@@ -17,6 +17,8 @@ export default function ClientConfigurations({ apiBaseUrl, token, onAction }) {
     const [originalSystemPrompt, setOriginalSystemPrompt] = useState('');
     const [welcomeMessage, setWelcomeMessage] = useState('');
     const [originalWelcomeMessage, setOriginalWelcomeMessage] = useState('');
+    const [queueWaitingMessage, setQueueWaitingMessage] = useState('');
+    const [originalQueueWaitingMessage, setOriginalQueueWaitingMessage] = useState('');
 
     // --- Industry States ---
     const [industry, setIndustry] = useState('Clubes');
@@ -146,6 +148,26 @@ export default function ClientConfigurations({ apiBaseUrl, token, onAction }) {
                         throw new Error(errorData.detail || `Erro ao carregar mensagem de saudação: Status ${welcomeResponse.status}`);
                     } else {
                         setWelcomeMessage('');
+                    }
+
+                    const queueUrl = `${apiBaseUrl}/queue-waiting-message`;
+                    const queueResponse = await fetch(queueUrl, {
+                        method: 'GET',
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json'
+                        }
+                    });
+
+                    if (queueResponse.ok) {
+                        const queueData = await queueResponse.json();
+                        setQueueWaitingMessage(queueData.message || '');
+                        setOriginalQueueWaitingMessage(queueData.message || '');
+                    } else if (queueResponse.status !== 404) {
+                        const errorData = await queueResponse.json().catch(() => ({}));
+                        throw new Error(errorData.detail || `Erro ao carregar mensagem da fila de espera: Status ${queueResponse.status}`);
+                    } else {
+                        setQueueWaitingMessage('');
                     }
 
                     const availableIndUrl = `/api/available-industries`;
@@ -408,6 +430,21 @@ export default function ClientConfigurations({ apiBaseUrl, token, onAction }) {
                     throw new Error(errorData.detail || `Erro ao salvar mensagem de saudação: Status ${welcomeResponse.status}`);
                 }
                 setOriginalWelcomeMessage(welcomeMessage);
+            }
+
+            if (queueWaitingMessage !== originalQueueWaitingMessage) {
+                const queueUrl = `${apiBaseUrl}/queue-waiting-message`;
+                const queueResponse = await fetch(queueUrl, {
+                    method: 'PUT',
+                    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: queueWaitingMessage })
+                });
+
+                if (!queueResponse.ok) {
+                    const errorData = await queueResponse.json().catch(() => ({}));
+                    throw new Error(errorData.detail || `Erro ao salvar mensagem da fila de espera: Status ${queueResponse.status}`);
+                }
+                setOriginalQueueWaitingMessage(queueWaitingMessage);
             }
 
             setIsEditingClientPrompt(false);
@@ -937,6 +974,17 @@ export default function ClientConfigurations({ apiBaseUrl, token, onAction }) {
                                         readOnly={!isEditingClientPrompt}
                                         className={`w-full h-32 p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 resize-y overflow-auto ${!isEditingClientPrompt ? 'bg-gray-100' : ''}`}
                                         placeholder="Nenhuma mensagem de saudação."
+                                    />
+                                </div>
+
+                                <div>
+                                    <h4 className="text-lg font-semibold text-gray-700 mb-2">Mensagem da Fila de Espera</h4>
+                                    <textarea
+                                        value={queueWaitingMessage}
+                                        onChange={(e) => setQueueWaitingMessage(e.target.value)}
+                                        readOnly={!isEditingClientPrompt}
+                                        className={`w-full h-32 p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 resize-y overflow-auto ${!isEditingClientPrompt ? 'bg-gray-100' : ''}`}
+                                        placeholder="Nenhuma mensagem da fila de espera."
                                     />
                                 </div>
                                 
