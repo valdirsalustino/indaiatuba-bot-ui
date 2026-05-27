@@ -116,7 +116,7 @@ function App() {
     setError(null);
     try {
       // Using the dynamic apiBaseUrl
-      const response = await authFetch(`${apiBaseUrl}/conversations?days=30&limit=${LIMIT}&skip=${currentSkip}`);
+      const response = await authFetch(`${apiBaseUrl}/conversations?limit=${LIMIT}&skip=${currentSkip}`);
       if (!response.ok) throw new Error('Failed to fetch conversations.');
 
       const serverData = await response.json();
