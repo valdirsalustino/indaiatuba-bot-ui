@@ -127,6 +127,26 @@ const ProfessionalDetailsEditor = ({ userDetails, onChange }) => {
                 />
             </div>
         </div>
+        <div className="mt-4">
+            <label className="block text-sm font-medium text-gray-700">Preço da Consulta (Particular)</label>
+            <div className="relative mt-1 rounded-md shadow-sm">
+                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                    <span className="text-gray-500 sm:text-sm">R$</span>
+                </div>
+                <input 
+                    type="number" 
+                    step="0.01"
+                    min="0"
+                    value={userDetails?.consultation_price || ''}
+                    onChange={(e) => {
+                        const val = e.target.value;
+                        onChange({ ...userDetails, consultation_price: val === '' ? null : parseFloat(val) });
+                    }}
+                    className="block w-full rounded-md border-gray-300 pl-10 focus:border-blue-500 focus:ring-blue-500 sm:text-sm px-2 py-1 border"
+                    placeholder="Ex: 350.00"
+                />
+            </div>
+        </div>
       </div>
     </div>
   );
@@ -143,7 +163,8 @@ export default function UserManagement({ token, apiBaseUrl, onAction, currentUse
     role: '', 
     working_hours: getDefaultWorkingHours(),
     specialty: '',
-    professional_id: { description: '', value: '' }
+    professional_id: { description: '', value: '' },
+    consultation_price: null
   });
   const [editingDetailsFor, setEditingDetailsFor] = useState(null);
   const [editingDetails, setEditingDetails] = useState(null);
@@ -188,6 +209,7 @@ export default function UserManagement({ token, apiBaseUrl, onAction, currentUse
           delete payload.working_hours;
           delete payload.specialty;
           delete payload.professional_id;
+          delete payload.consultation_price;
       } else {
           if (!payload.professional_id?.description && !payload.professional_id?.value) {
               delete payload.professional_id;
@@ -214,7 +236,8 @@ export default function UserManagement({ token, apiBaseUrl, onAction, currentUse
         role: '', 
         working_hours: getDefaultWorkingHours(),
         specialty: '',
-        professional_id: { description: '', value: '' }
+        professional_id: { description: '', value: '' },
+        consultation_price: null
       });
       fetchUsers(); // Refresh the user list
     } catch (err) {
@@ -338,7 +361,8 @@ export default function UserManagement({ token, apiBaseUrl, onAction, currentUse
                                                   setEditingDetails({
                                                       working_hours: user.working_hours || getDefaultWorkingHours(),
                                                       specialty: user.specialty || '',
-                                                      professional_id: user.professional_id || { description: '', value: '' }
+                                                      professional_id: user.professional_id || { description: '', value: '' },
+                                                      consultation_price: user.consultation_price || null
                                                   });
                                                   setEditingDetailsFor(user.username);
                                               }
