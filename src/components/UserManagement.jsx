@@ -89,15 +89,64 @@ const WorkingHoursEditor = ({ workingHours, onChange }) => {
     </div>
   );
 };
+
+const ProfessionalDetailsEditor = ({ userDetails, onChange }) => {
+  return (
+    <div className="p-4 bg-gray-50 border rounded-md mb-4">
+      <h4 className="font-semibold text-gray-700 mb-3">Informações Profissionais</h4>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-y-4 gap-x-6">
+        <div>
+            <label className="block text-sm font-medium text-gray-700">Especialidade</label>
+            <input 
+                type="text" 
+                value={userDetails?.specialty || ''}
+                onChange={(e) => onChange({ ...userDetails, specialty: e.target.value })}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm px-2 py-1 border"
+                placeholder="Ex: Ortopedista e Cirurgião"
+            />
+        </div>
+        <div className="flex space-x-2">
+            <div className="w-1/3">
+                <label className="block text-sm font-medium text-gray-700">Tipo de Registro</label>
+                <input 
+                    type="text" 
+                    value={userDetails?.professional_id?.description || ''}
+                    onChange={(e) => onChange({ ...userDetails, professional_id: { ...(userDetails?.professional_id || {}), description: e.target.value } })}
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm px-2 py-1 border"
+                    placeholder="Ex: CRM"
+                />
+            </div>
+            <div className="w-2/3">
+                <label className="block text-sm font-medium text-gray-700">Número do Registro</label>
+                <input 
+                    type="text" 
+                    value={userDetails?.professional_id?.value || ''}
+                    onChange={(e) => onChange({ ...userDetails, professional_id: { ...(userDetails?.professional_id || {}), value: e.target.value } })}
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm px-2 py-1 border"
+                    placeholder="Ex: 12345-SP"
+                />
+            </div>
+        </div>
+      </div>
+    </div>
+  );
+};
 export default function UserManagement({ token, apiBaseUrl, onAction, currentUser, departments = [] }) {
   const [message, setMessage] = useState('');
   const [isError, setIsError] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [users, setUsers] = useState([]);
   const [isAdding, setIsAdding] = useState(false);
-  const [newUser, setNewUser] = useState({ username: '', name: '', role: '', working_hours: getDefaultWorkingHours() });
-  const [editingWorkingHoursFor, setEditingWorkingHoursFor] = useState(null);
-  const [editingWorkingHours, setEditingWorkingHours] = useState(null);
+  const [newUser, setNewUser] = useState({ 
+    username: '', 
+    name: '', 
+    role: '', 
+    working_hours: getDefaultWorkingHours(),
+    specialty: '',
+    professional_id: { description: '', value: '' }
+  });
+  const [editingDetailsFor, setEditingDetailsFor] = useState(null);
+  const [editingDetails, setEditingDetails] = useState(null);
 
   const fetchUsers = async () => {
     try {
@@ -137,6 +186,12 @@ export default function UserManagement({ token, apiBaseUrl, onAction, currentUse
       const payload = { ...newUser };
       if (payload.role !== 'Médico') {
           delete payload.working_hours;
+          delete payload.specialty;
+          delete payload.professional_id;
+      } else {
+          if (!payload.professional_id?.description && !payload.professional_id?.value) {
+              delete payload.professional_id;
+          }
       }
 
       const response = await fetch(`${apiBaseUrl}/users`, {
@@ -153,7 +208,14 @@ export default function UserManagement({ token, apiBaseUrl, onAction, currentUse
       }
       setMessage(`User "${data.username}" created successfully! Password: ${data.temporary_password}`);
       setIsAdding(false);
-      setNewUser({ username: '', name: '', role: '', working_hours: getDefaultWorkingHours() });
+      setNewUser({ 
+        username: '', 
+        name: '', 
+        role: '', 
+        working_hours: getDefaultWorkingHours(),
+        specialty: '',
+        professional_id: { description: '', value: '' }
+      });
       fetchUsers(); // Refresh the user list
     } catch (err) {
       setMessage(err.message);
@@ -270,15 +332,19 @@ export default function UserManagement({ token, apiBaseUrl, onAction, currentUse
                                   {user.role === 'Médico' && (
                                       <button 
                                           onClick={() => {
-                                              if (editingWorkingHoursFor === user.username) {
-                                                  setEditingWorkingHoursFor(null);
+                                              if (editingDetailsFor === user.username) {
+                                                  setEditingDetailsFor(null);
                                               } else {
-                                                  setEditingWorkingHours(user.working_hours || getDefaultWorkingHours());
-                                                  setEditingWorkingHoursFor(user.username);
+                                                  setEditingDetails({
+                                                      working_hours: user.working_hours || getDefaultWorkingHours(),
+                                                      specialty: user.specialty || '',
+                                                      professional_id: user.professional_id || { description: '', value: '' }
+                                                  });
+                                                  setEditingDetailsFor(user.username);
                                               }
                                           }} 
                                           className="text-blue-500 hover:text-blue-700 shrink-0"
-                                          title="Editar Horário de Atendimento"
+                                          title="Editar Detalhes Profissionais"
                                       >
                                           <ClockIcon />
                                       </button>
@@ -295,28 +361,36 @@ export default function UserManagement({ token, apiBaseUrl, onAction, currentUse
                                   </div>
                               </td>
                           </tr>
-                          {editingWorkingHoursFor === user.username && (
-                              <tr key={`${user.username}-hours`} className="bg-gray-50 border-b">
+                          {editingDetailsFor === user.username && (
+                              <tr key={`${user.username}-details`} className="bg-gray-50 border-b">
                                   <td colSpan="4" className="px-6 py-4">
+                                      <ProfessionalDetailsEditor 
+                                          userDetails={editingDetails} 
+                                          onChange={setEditingDetails} 
+                                      />
                                       <WorkingHoursEditor 
-                                          workingHours={editingWorkingHours} 
-                                          onChange={setEditingWorkingHours} 
+                                          workingHours={editingDetails.working_hours} 
+                                          onChange={(wh) => setEditingDetails({...editingDetails, working_hours: wh})} 
                                       />
                                       <div className="flex justify-end mt-4 space-x-2">
                                           <button 
-                                              onClick={() => setEditingWorkingHoursFor(null)} 
+                                              onClick={() => setEditingDetailsFor(null)} 
                                               className="px-4 py-2 text-sm text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 transition-colors"
                                           >
                                               Cancelar
                                           </button>
                                           <button 
                                               onClick={() => {
-                                                  handleUpdateUser(user.username, { working_hours: editingWorkingHours });
-                                                  setEditingWorkingHoursFor(null);
+                                                  const updatePayload = { ...editingDetails };
+                                                  if (!updatePayload.professional_id?.description && !updatePayload.professional_id?.value) {
+                                                      updatePayload.professional_id = null;
+                                                  }
+                                                  handleUpdateUser(user.username, updatePayload);
+                                                  setEditingDetailsFor(null);
                                               }} 
                                               className="px-4 py-2 text-sm text-white bg-blue-600 rounded-md hover:bg-blue-700 transition-colors"
                                           >
-                                              Salvar Horários
+                                              Salvar Detalhes
                                           </button>
                                       </div>
                                   </td>
@@ -372,6 +446,10 @@ export default function UserManagement({ token, apiBaseUrl, onAction, currentUse
                           {newUser.role === 'Médico' && (
                               <tr className="bg-blue-50 border-b">
                                   <td colSpan="4" className="px-6 py-4">
+                                      <ProfessionalDetailsEditor 
+                                          userDetails={newUser} 
+                                          onChange={setNewUser} 
+                                      />
                                       <WorkingHoursEditor 
                                           workingHours={newUser.working_hours} 
                                           onChange={(wh) => setNewUser({ ...newUser, working_hours: wh })} 
