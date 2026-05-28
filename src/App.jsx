@@ -35,6 +35,13 @@ const getUserFromToken = (token) => {
 
 const getTenantFromUrl = () => {
     const hostname = window.location.hostname;
+    
+    // For local development with Google OAuth, subdomains in redirect URIs are not allowed.
+    // Allow an override via Vite env var, or fallback to a default if accessed via pure localhost.
+    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+        return import.meta.env.VITE_DEFAULT_TENANT || 'indaiatubadayhospital';
+    }
+
     const parts = hostname.split('.');
 
     const isLocalhost = hostname.includes('localhost');
