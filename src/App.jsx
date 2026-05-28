@@ -67,6 +67,7 @@ function App() {
   const [error, setError] = useState(null);
   const [activeView, setActiveView] = useState('conversations');
   const [departments, setDepartments] = useState([]);
+  const [clientName, setClientName] = useState('');
 
   // Pagination States
   const [skip, setSkip] = useState(0);
@@ -194,6 +195,19 @@ function App() {
         }
     } catch (error) {
         console.error("Failed to fetch departments:", error);
+    }
+  }, [token, apiBaseUrl, authFetch]);
+
+  const fetchClientInfo = useCallback(async () => {
+    if (!token) return;
+    try {
+        const response = await authFetch(`${apiBaseUrl}/client-info`);
+        if (response.ok) {
+            const data = await response.json();
+            setClientName(data.client_name || '');
+        }
+    } catch (error) {
+        console.error("Failed to fetch client info:", error);
     }
   }, [token, apiBaseUrl, authFetch]);
 
@@ -393,8 +407,9 @@ function App() {
   useEffect(() => {
     if (token && (activeView === 'conversations' || activeView === 'userManagement')) {
         fetchDepartments();
+        fetchClientInfo();
     }
-  }, [token, activeView, fetchDepartments]);
+  }, [token, activeView, fetchDepartments, fetchClientInfo]);
 
   const handleLogin = (newToken) => {
     localStorage.setItem('admin_token', newToken);
@@ -595,6 +610,7 @@ function App() {
                 currentUser={currentUser}
                 departments={departments}
                 isLatestThread={isLatestThread}
+                clientName={clientName}
             />
         )}
 

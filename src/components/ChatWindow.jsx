@@ -31,7 +31,7 @@ const MediaRenderer = ({ msg }) => {
     }
 };
 
-export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved, onInitiateTransfer, onTakeOver, onReopenThread, currentUser, departments = [], isLatestThread = false }) {
+export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved, onInitiateTransfer, onTakeOver, onReopenThread, currentUser, departments = [], isLatestThread = false, clientName = '' }) {
   const [editorHtml, setEditorHtml] = useState('');
   const [attachedFile, setAttachedFile] = useState(null);
   const messagesEndRef = useRef(null);
@@ -231,7 +231,7 @@ export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved
             const nameAlignment = isUserMessage ? 'text-left self-start' : 'text-right self-end';
             let senderName = msg.sender === 'user'
                 ? (conversation.user_name || 'Cliente')
-                : msg.sender === 'bot' ? 'Indaiatuba IA' : msg.sender;
+                : msg.sender === 'bot' ? (clientName ? `${clientName} - IA` : 'IA') : msg.sender;
 
             let bgColor = 'bg-green-100';
             if (isUserMessage) {
