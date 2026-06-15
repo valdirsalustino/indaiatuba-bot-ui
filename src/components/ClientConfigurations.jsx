@@ -20,10 +20,12 @@ export default function ClientConfigurations({ apiBaseUrl, token, onAction }) {
     const [queueWaitingMessage, setQueueWaitingMessage] = useState('');
     const [originalQueueWaitingMessage, setOriginalQueueWaitingMessage] = useState('');
 
-    // --- Industry States ---
     const [industry, setIndustry] = useState('Clubes');
     const [originalIndustry, setOriginalIndustry] = useState('Clubes');
     const [availableIndustries, setAvailableIndustries] = useState(['Clubes']);
+    const [enableGoogleCalendarScheduling, setEnableGoogleCalendarScheduling] = useState(false);
+    const [originalEnableGoogleCalendarScheduling, setOriginalEnableGoogleCalendarScheduling] = useState(false);
+
 
     // --- Topics States ---
     const [topics, setTopics] = useState([]);
@@ -190,6 +192,18 @@ export default function ClientConfigurations({ apiBaseUrl, token, onAction }) {
                         setIndustry(indData.industry || 'Clubes');
                         setOriginalIndustry(indData.industry || 'Clubes');
                     }
+
+                    const featuresUrl = `${apiBaseUrl}/features`;
+                    const featuresResponse = await fetch(featuresUrl, {
+                        method: 'GET',
+                        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
+                    });
+                    if (featuresResponse.ok) {
+                        const featData = await featuresResponse.json();
+                        setEnableGoogleCalendarScheduling(featData.enable_google_calendar_scheduling || false);
+                        setOriginalEnableGoogleCalendarScheduling(featData.enable_google_calendar_scheduling || false);
+                    }
+
 
                     const topicsUrl = `${apiBaseUrl}/topic-classification`;
                     const topicsResponse = await fetch(topicsUrl, {
@@ -401,6 +415,22 @@ export default function ClientConfigurations({ apiBaseUrl, token, onAction }) {
                 }
                 setOriginalIndustry(industry);
             }
+
+            if (enableGoogleCalendarScheduling !== originalEnableGoogleCalendarScheduling) {
+                const featuresUrl = `${apiBaseUrl}/features`;
+                const featuresResponse = await fetch(featuresUrl, {
+                    method: 'PUT',
+                    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ enable_google_calendar_scheduling: enableGoogleCalendarScheduling })
+                });
+
+                if (!featuresResponse.ok) {
+                    const errorData = await featuresResponse.json().catch(() => ({}));
+                    throw new Error(errorData.detail || `Erro ao salvar recursos: Status ${featuresResponse.status}`);
+                }
+                setOriginalEnableGoogleCalendarScheduling(enableGoogleCalendarScheduling);
+            }
+
 
             if (systemPrompt !== originalSystemPrompt) {
                 const promptUrl = `${apiBaseUrl}/system-prompt`;
@@ -933,7 +963,10 @@ export default function ClientConfigurations({ apiBaseUrl, token, onAction }) {
                                     <label className="block text-sm font-medium text-gray-700 mb-1">Indústria (Tipo de Negócio)</label>
                                     <select
                                         value={industry}
-                                        onChange={(e) => setIndustry(e.target.value)}
+                                        onChange={(e) => {
+                                            const val = e.target.value;
+                                            setIndustry(val);
+                                        }}
                                         disabled={!isEditingClientPrompt}
                                         className={`w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 ${!isEditingClientPrompt ? 'bg-gray-100' : ''}`}
                                     >
@@ -942,6 +975,21 @@ export default function ClientConfigurations({ apiBaseUrl, token, onAction }) {
                                         ))}
                                     </select>
                                 </div>
+
+                                <div className="flex items-center space-x-2 pt-2">
+                                    <input
+                                        type="checkbox"
+                                        id="enableGoogleCalendarScheduling"
+                                        checked={enableGoogleCalendarScheduling}
+                                        onChange={() => {}}
+                                        disabled={true}
+                                        className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 disabled:opacity-50 cursor-not-allowed"
+                                    />
+                                    <label htmlFor="enableGoogleCalendarScheduling" className="text-sm font-medium text-gray-400 select-none cursor-not-allowed">
+                                        Habilitar Agendamento de Consultas (Google Calendar)
+                                    </label>
+                                </div>
+
 
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">Nome do Cliente</label>

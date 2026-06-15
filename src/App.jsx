@@ -80,9 +80,8 @@ function App() {
   const [departments, setDepartments] = useState([]);
   const [clientName, setClientName] = useState('');
   const [industry, setIndustry] = useState(null);
+  const [features, setFeatures] = useState({ enable_google_calendar_scheduling: false });
 
-  // Configuration for which industries show the calendar
-  const CALENDAR_ENABLED_INDUSTRIES = ["Hospitais e Clínicas"];
 
   // Pagination States
   const [skip, setSkip] = useState(0);
@@ -238,6 +237,20 @@ function App() {
         console.error("Failed to fetch industry:", error);
     }
   }, [token, apiBaseUrl, authFetch]);
+
+  const fetchFeatures = useCallback(async () => {
+    if (!token) return;
+    try {
+        const response = await authFetch(`${apiBaseUrl}/features`);
+        if (response.ok) {
+            const data = await response.json();
+            setFeatures(data);
+        }
+    } catch (error) {
+        console.error("Failed to fetch features:", error);
+    }
+  }, [token, apiBaseUrl, authFetch]);
+
 
   // Expose a loadMore function to pass to the ConversationList
   const loadMoreConversations = () => {
@@ -437,8 +450,10 @@ function App() {
         fetchDepartments();
         fetchClientInfo();
         fetchIndustry();
+        fetchFeatures();
     }
-  }, [token, activeView, fetchDepartments, fetchClientInfo, fetchIndustry]);
+  }, [token, activeView, fetchDepartments, fetchClientInfo, fetchIndustry, fetchFeatures]);
+
 
   const handleLogin = (newToken) => {
     localStorage.setItem('admin_token', newToken);
@@ -577,7 +592,8 @@ function App() {
     return allConvsForPhone.length > 0 && allConvsForPhone[0].composite_id === selectedConversation.composite_id;
   }, [conversations, selectedConversation]);
 
-  const isCalendarEnabled = industry ? CALENDAR_ENABLED_INDUSTRIES.includes(industry) : false;
+  const isCalendarEnabled = features?.enable_google_calendar_scheduling || false;
+
 
   if (isValidTenant === null) {
       return <div className="flex items-center justify-center h-screen bg-gray-200">Validando cliente...</div>;
