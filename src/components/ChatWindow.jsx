@@ -31,7 +31,7 @@ const MediaRenderer = ({ msg }) => {
     }
 };
 
-export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved, onInitiateTransfer, onTakeOver, onReopenThread, currentUser, departments = [], isLatestThread = false, clientName = '' }) {
+export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved, onInitiateTransfer, onTakeOver, onReopenThread, currentUser, departments = [], isLatestThread = false, clientName = '', showTopics = false, showLeads = false }) {
   const [editorHtml, setEditorHtml] = useState('');
   const [attachedFile, setAttachedFile] = useState(null);
   const messagesEndRef = useRef(null);
@@ -212,6 +212,44 @@ export default function ChatWindow({ conversation, onSendMessage, onMarkAsSolved
             )}
         </div>
       </header>
+
+      {/* --- Explainability Banner --- */}
+      {conversation && ((showTopics && conversation.topic) || (showLeads && conversation.lead)) && (
+        <div className="bg-indigo-50 border-b border-indigo-100 p-3 space-y-2.5 flex flex-col border-l-4 border-indigo-500 shadow-inner">
+          {showTopics && conversation.topic && (
+            <div>
+              <div className="text-xs font-bold text-indigo-950 flex items-center gap-1.5">
+                <svg className="w-4 h-4 text-indigo-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 7h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                <span>Tópico:</span>
+                <span className="font-semibold px-2 py-0.5 bg-indigo-100 text-indigo-800 rounded-md text-[11px]">{conversation.topic}</span>
+              </div>
+              {conversation.topic_summary && (
+                <p className="text-xs text-indigo-800 mt-1 pl-5 font-normal leading-relaxed">
+                  {conversation.topic_summary}
+                </p>
+              )}
+            </div>
+          )}
+          {showLeads && conversation.lead && (
+            <div className={showTopics && conversation.topic ? "pt-2.5 border-t border-indigo-100" : ""}>
+              <div className="text-xs font-bold text-indigo-950 flex items-center gap-1.5">
+                <svg className="w-4 h-4 text-indigo-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+                <span>Status do Lead:</span>
+                <span className="font-semibold px-2 py-0.5 bg-indigo-100 text-indigo-800 rounded-md text-[11px]">{conversation.lead}</span>
+              </div>
+              {conversation.lead_summary && (
+                <p className="text-xs text-indigo-800 mt-1 pl-5 font-normal leading-relaxed">
+                  {conversation.lead_summary}
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="flex-grow p-6 overflow-y-auto bg-cover bg-center" style={{ backgroundImage: "url('https://i.pinimg.com/736x/8c/98/99/8c98994518b575bfd8c949e91d20548b.jpg')" }}>
         <div className="flex flex-col space-y-2">

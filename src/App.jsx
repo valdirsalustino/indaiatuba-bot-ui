@@ -81,6 +81,14 @@ function App() {
   const [clientName, setClientName] = useState('');
   const [industry, setIndustry] = useState(null);
   const [features, setFeatures] = useState({ enable_google_calendar_scheduling: false });
+  const [showTopics, setShowTopics] = useState(false);
+  const [showLeads, setShowLeads] = useState(false);
+  const [filterTopic, setFilterTopic] = useState('');
+  const [filterLead, setFilterLead] = useState('');
+  const [classificationLabels, setClassificationLabels] = useState({ topics: [], leads: [] });
+
+  const filterTopicRef = useRef('');
+  const filterLeadRef = useRef('');
 
 
   // Pagination States
@@ -125,13 +133,24 @@ function App() {
   }, [handleLogout]);
 
   // Updated fetchConversations to handle pagination
-  const fetchConversations = useCallback(async (currentSkip = 0, isLoadMore = false) => {
+  const fetchConversations = useCallback(async (currentSkip = 0, isLoadMore = false, topicParam = undefined, leadParam = undefined) => {
     if (!token) return;
     setIsLoading(true);
     setError(null);
     try {
+      const activeTopic = topicParam !== undefined ? topicParam : filterTopicRef.current;
+      const activeLead = leadParam !== undefined ? leadParam : filterLeadRef.current;
+
+      let url = `${apiBaseUrl}/conversations?limit=${LIMIT}&skip=${currentSkip}`;
+      if (activeTopic) {
+        url += `&topic=${encodeURIComponent(activeTopic)}`;
+      }
+      if (activeLead) {
+        url += `&lead=${encodeURIComponent(activeLead)}`;
+      }
+
       // Using the dynamic apiBaseUrl
-      const response = await authFetch(`${apiBaseUrl}/conversations?limit=${LIMIT}&skip=${currentSkip}`);
+      const response = await authFetch(url);
       if (!response.ok) throw new Error('Failed to fetch conversations.');
 
       const serverData = await response.json();
@@ -250,6 +269,30 @@ function App() {
         console.error("Failed to fetch features:", error);
     }
   }, [token, apiBaseUrl, authFetch]);
+
+  const fetchClassificationLabels = useCallback(async () => {
+    if (!token) return;
+    try {
+        const response = await authFetch(`${apiBaseUrl}/classifications/labels`);
+        if (response.ok) {
+            const data = await response.json();
+            setClassificationLabels(data);
+        }
+    } catch (error) {
+        console.error("Failed to fetch classification labels:", error);
+    }
+  }, [token, apiBaseUrl, authFetch]);
+
+  const handleFilterChange = (newTopic, newLead) => {
+    setFilterTopic(newTopic);
+    setFilterLead(newLead);
+    filterTopicRef.current = newTopic;
+    filterLeadRef.current = newLead;
+    setSkip(0);
+    setHasMore(true);
+    setConversations([]);
+    fetchConversations(0, false, newTopic, newLead);
+  };
 
 
   // Expose a loadMore function to pass to the ConversationList
@@ -451,8 +494,9 @@ function App() {
         fetchClientInfo();
         fetchIndustry();
         fetchFeatures();
+        fetchClassificationLabels();
     }
-  }, [token, activeView, fetchDepartments, fetchClientInfo, fetchIndustry, fetchFeatures]);
+  }, [token, activeView, fetchDepartments, fetchClientInfo, fetchIndustry, fetchFeatures, fetchClassificationLabels]);
 
 
   const handleLogin = (newToken) => {
@@ -655,6 +699,15 @@ function App() {
                 onShowAdminCalendar={() => setActiveView('adminCalendar')}
                 currentUser={currentUser}
                 onLoadMore={loadMoreConversations}
+                showTopics={showTopics}
+                setShowTopics={setShowTopics}
+                showLeads={showLeads}
+                setShowLeads={setShowLeads}
+                enableLeadClassification={features?.enable_lead_classification || false}
+                classificationLabels={classificationLabels}
+                filterTopic={filterTopic}
+                filterLead={filterLead}
+                onFilterChange={handleFilterChange}
               />
             )}
 
@@ -670,6 +723,8 @@ function App() {
                     departments={departments}
                     isLatestThread={isLatestThread}
                     clientName={clientName}
+                    showTopics={showTopics}
+                    showLeads={showLeads}
                 />
             )}
 
