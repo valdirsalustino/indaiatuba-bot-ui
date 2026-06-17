@@ -37,6 +37,10 @@ const CalendarIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
 );
 
+const FilterIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 text-gray-500"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg>
+);
+
 const formatDisplayDate = (timestamp) => {
   const messageDate = new Date(timestamp);
   const today = new Date();
@@ -97,6 +101,7 @@ export default function ConversationList({
   onFilterChange
 }) {
   const [searchQuery, setSearchQuery] = useState('');
+  const [isFiltersOpen, setIsFiltersOpen] = useState(false);
 
   // Detect scroll reaching the bottom
   const handleScroll = (e) => {
@@ -179,86 +184,110 @@ export default function ConversationList({
         </div>
       </header>
 
-      {/* --- Search Bar --- */}
-      <div className="p-2 border-b border-gray-200">
-        <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <SearchIcon />
-            </div>
-            <input
-                type="text"
-                placeholder="Pesquisar..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-gray-100 border border-gray-200 rounded-full py-2 pl-10 pr-4 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-            />
-        </div>
-      </div>
-
-      {/* --- Explainability Toggles --- */}
-      <div className="px-4 py-2.5 border-b border-gray-200 bg-gray-50 flex flex-col gap-2.5">
-        <div className="flex items-center justify-between">
-          <span className="text-xs font-semibold text-gray-600">Visualizar tópicos da conversa</span>
+      {/* --- Search Bar & Filters Trigger --- */}
+      <div className="p-2 border-b border-gray-200 flex flex-col">
+        <div className="flex gap-2 items-center">
+          <div className="relative flex-grow">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <SearchIcon />
+              </div>
+              <input
+                  type="text"
+                  placeholder="Pesquisar..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full bg-gray-100 border border-gray-200 rounded-full py-2 pl-10 pr-4 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+              />
+          </div>
           <button
-            onClick={() => setShowTopics(!showTopics)}
-            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 focus:outline-none ${
-              showTopics ? 'bg-blue-500' : 'bg-gray-200'
-            }`}
+            onClick={() => setIsFiltersOpen(!isFiltersOpen)}
+            className="border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 rounded-lg px-3 py-2 text-sm font-medium flex items-center gap-2 flex-shrink-0 transition-colors duration-200 shadow-sm"
+            title="Filtros e Visualização"
           >
-            <span
-              className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform duration-200 ${
-                showTopics ? 'translate-x-4' : 'translate-x-0.5'
-              }`}
-            />
+            <FilterIcon />
+            <span className="hidden xl:inline">Filtros e Visualização</span>
+            <span className="xl:hidden hidden md:inline">Filtros</span>
           </button>
         </div>
-        {enableLeadClassification && (
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-gray-600">Visualizar leads</span>
-            <button
-              onClick={() => setShowLeads(!showLeads)}
-              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 focus:outline-none ${
-                showLeads ? 'bg-blue-500' : 'bg-gray-200'
-              }`}
-            >
-              <span
-                className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform duration-200 ${
-                  showLeads ? 'translate-x-4' : 'translate-x-0.5'
-                }`}
-              />
-            </button>
-          </div>
-        )}
-      </div>
 
-      {/* --- Classification Filters --- */}
-      <div className="px-4 py-3 border-b border-gray-200 bg-white space-y-2.5">
-        <div className="flex flex-col">
-          <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Filtrar por Tópico</label>
-          <select
-            value={filterTopic}
-            onChange={(e) => onFilterChange(e.target.value, filterLead)}
-            className="w-full bg-gray-50 border border-gray-300 text-gray-700 text-sm rounded-lg p-1.5 focus:ring-blue-500 focus:border-blue-500 focus:outline-none"
-          >
-            <option value="">Todos os tópicos</option>
-            {classificationLabels?.topics?.map(topic => (
-              <option key={topic} value={topic}>{topic}</option>
-            ))}
-          </select>
-        </div>
-        {enableLeadClassification && (
-          <div className="flex flex-col">
-            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Filtrar por Lead</label>
-            <select
-              value={filterLead}
-              onChange={(e) => onFilterChange(filterTopic, e.target.value)}
-              className="w-full bg-gray-50 border border-gray-300 text-gray-700 text-sm rounded-lg p-1.5 focus:ring-blue-500 focus:border-blue-500 focus:outline-none"
-            >
-              <option value="">Todos os leads</option>
-              {classificationLabels?.leads?.map(lead => (
-                <option key={lead} value={lead}>{lead}</option>
-              ))}
-            </select>
+        {/* --- Collapsible Panel --- */}
+        {isFiltersOpen && (
+          <div className="bg-gray-50 p-3.5 rounded-lg border border-gray-200 mt-2 shadow-sm space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Column 1: Toggles */}
+              <div className="space-y-2.5">
+                <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Visualização</h4>
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center justify-between bg-white p-2 rounded-lg border border-gray-150 shadow-sm">
+                    <span className="text-xs font-semibold text-gray-600">Ver Tópicos</span>
+                    <button
+                      onClick={() => setShowTopics(!showTopics)}
+                      className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 focus:outline-none flex-shrink-0 ${
+                        showTopics ? 'bg-blue-500' : 'bg-gray-200'
+                      }`}
+                    >
+                      <span
+                        className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform duration-200 ${
+                          showTopics ? 'translate-x-4' : 'translate-x-0.5'
+                        }`}
+                      />
+                    </button>
+                  </div>
+                  {enableLeadClassification && (
+                    <div className="flex items-center justify-between bg-white p-2 rounded-lg border border-gray-150 shadow-sm">
+                      <span className="text-xs font-semibold text-gray-600">Ver Leads</span>
+                      <button
+                        onClick={() => setShowLeads(!showLeads)}
+                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 focus:outline-none flex-shrink-0 ${
+                          showLeads ? 'bg-blue-500' : 'bg-gray-200'
+                        }`}
+                      >
+                        <span
+                          className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform duration-200 ${
+                            showLeads ? 'translate-x-4' : 'translate-x-0.5'
+                          }`}
+                        />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Column 2: Filters */}
+              <div className="space-y-2.5">
+                <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Filtros</h4>
+                <div className="space-y-2">
+                  <div className="flex flex-col">
+                    <label className="text-[10px] font-bold text-gray-500 mb-1">Filtrar por Tópico</label>
+                    <select
+                      value={filterTopic}
+                      onChange={(e) => onFilterChange(e.target.value, filterLead)}
+                      className="w-full bg-white border border-gray-300 text-gray-700 text-xs rounded-lg p-1.5 focus:ring-blue-500 focus:border-blue-500 focus:outline-none shadow-sm"
+                    >
+                      <option value="">Todos os tópicos</option>
+                      {classificationLabels?.topics?.map(topic => (
+                        <option key={topic} value={topic}>{topic}</option>
+                      ))}
+                    </select>
+                  </div>
+                  {enableLeadClassification && (
+                    <div className="flex flex-col">
+                      <label className="text-[10px] font-bold text-gray-500 mb-1">Filtrar por Lead</label>
+                      <select
+                        value={filterLead}
+                        onChange={(e) => onFilterChange(filterTopic, e.target.value)}
+                        className="w-full bg-white border border-gray-300 text-gray-700 text-xs rounded-lg p-1.5 focus:ring-blue-500 focus:border-blue-500 focus:outline-none shadow-sm"
+                      >
+                        <option value="">Todos os leads</option>
+                        {classificationLabels?.leads?.map(lead => (
+                          <option key={lead} value={lead}>{lead}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
         )}
       </div>
