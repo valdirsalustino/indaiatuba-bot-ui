@@ -25,6 +25,11 @@ export default function ClientConfigurations({ apiBaseUrl, token, onAction }) {
     const [availableIndustries, setAvailableIndustries] = useState(['Clubes']);
     const [enableGoogleCalendarScheduling, setEnableGoogleCalendarScheduling] = useState(false);
     const [originalEnableGoogleCalendarScheduling, setOriginalEnableGoogleCalendarScheduling] = useState(false);
+    const [enableLeadClassification, setEnableLeadClassification] = useState(false);
+    const [leadClassificationPrompt, setLeadClassificationPrompt] = useState('');
+    const [originalLeadClassificationPrompt, setOriginalLeadClassificationPrompt] = useState('');
+    const [isEditingLeadPrompt, setIsEditingLeadPrompt] = useState(false);
+    const [savingLeadPrompt, setSavingLeadPrompt] = useState(false);
 
 
     // --- Topics States ---
@@ -202,6 +207,27 @@ export default function ClientConfigurations({ apiBaseUrl, token, onAction }) {
                         const featData = await featuresResponse.json();
                         setEnableGoogleCalendarScheduling(featData.enable_google_calendar_scheduling || false);
                         setOriginalEnableGoogleCalendarScheduling(featData.enable_google_calendar_scheduling || false);
+                        setEnableLeadClassification(featData.enable_lead_classification || false);
+                    }
+
+                    const leadPromptUrl = `${apiBaseUrl}/lead-classification-prompt`;
+                    const leadPromptResponse = await fetch(leadPromptUrl, {
+                        method: 'GET',
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json'
+                        }
+                    });
+
+                    if (leadPromptResponse.ok) {
+                        const leadPromptData = await leadPromptResponse.json();
+                        setLeadClassificationPrompt(leadPromptData.prompt || '');
+                        setOriginalLeadClassificationPrompt(leadPromptData.prompt || '');
+                    } else if (leadPromptResponse.status !== 404) {
+                        const errorData = await leadPromptResponse.json().catch(() => ({}));
+                        throw new Error(errorData.detail || `Erro ao carregar prompt de lead: Status ${leadPromptResponse.status}`);
+                    } else {
+                        setLeadClassificationPrompt('');
                     }
 
 
@@ -482,6 +508,32 @@ export default function ClientConfigurations({ apiBaseUrl, token, onAction }) {
             setClientPromptError(error.message || 'Falha ao salvar dados.');
         } finally {
             setSavingClientPrompt(false);
+        }
+    };
+
+    const handleSaveLeadPrompt = async () => {
+        setSavingLeadPrompt(true);
+        setClientPromptError('');
+        try {
+            if (leadClassificationPrompt !== originalLeadClassificationPrompt) {
+                const promptUrl = `${apiBaseUrl}/lead-classification-prompt`;
+                const promptResponse = await fetch(promptUrl, {
+                    method: 'PUT',
+                    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prompt: leadClassificationPrompt })
+                });
+
+                if (!promptResponse.ok) {
+                    const errorData = await promptResponse.json().catch(() => ({}));
+                    throw new Error(errorData.detail || `Erro ao salvar prompt de lead: Status ${promptResponse.status}`);
+                }
+                setOriginalLeadClassificationPrompt(leadClassificationPrompt);
+            }
+            setIsEditingLeadPrompt(false);
+        } catch (error) {
+            setClientPromptError(error.message || 'Falha ao salvar prompt de lead.');
+        } finally {
+            setSavingLeadPrompt(false);
         }
     };
 
@@ -990,6 +1042,20 @@ export default function ClientConfigurations({ apiBaseUrl, token, onAction }) {
                                     </label>
                                 </div>
 
+                                <div className="flex items-center space-x-2 pt-2">
+                                    <input
+                                        type="checkbox"
+                                        id="enableLeadClassification"
+                                        checked={enableLeadClassification}
+                                        onChange={() => {}}
+                                        disabled={true}
+                                        className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 disabled:opacity-50 cursor-not-allowed"
+                                    />
+                                    <label htmlFor="enableLeadClassification" className="text-sm font-medium text-gray-400 select-none cursor-not-allowed">
+                                        Habilitar Classificação de Leads
+                                    </label>
+                                </div>
+
 
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">Nome do Cliente</label>
@@ -1108,6 +1174,41 @@ export default function ClientConfigurations({ apiBaseUrl, token, onAction }) {
                                         <div id="topics-end" />
                                     </div>
                                 </div>
+
+                                {enableLeadClassification && (
+                                    <div className="mt-8 border-t border-gray-200 pt-6">
+                                        <div className="flex justify-between items-center mb-4">
+                                            <h4 className="text-lg font-semibold text-gray-700">Classificação das Leads</h4>
+                                            <div>
+                                                {!isEditingLeadPrompt ? (
+                                                    <button
+                                                        onClick={() => setIsEditingLeadPrompt(true)}
+                                                        className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 focus:outline-none"
+                                                    >
+                                                        Editar
+                                                    </button>
+                                                ) : (
+                                                    <button
+                                                        onClick={handleSaveLeadPrompt}
+                                                        disabled={savingLeadPrompt}
+                                                        className={`px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 focus:outline-none ${savingLeadPrompt ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                                    >
+                                                        {savingLeadPrompt ? 'Salvando...' : 'Salvar'}
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <textarea
+                                                value={leadClassificationPrompt}
+                                                onChange={(e) => setLeadClassificationPrompt(e.target.value)}
+                                                readOnly={!isEditingLeadPrompt}
+                                                className={`w-full h-64 p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 resize-y overflow-auto ${!isEditingLeadPrompt ? 'bg-gray-100' : ''}`}
+                                                placeholder="Nenhum prompt de classificação de leads encontrado."
+                                            />
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         )}
                     </div>
