@@ -403,7 +403,10 @@ function App() {
                   sender: data.data.sender,
                   timestamp: data.data.timestamp,
                   media_url: data.data.media_url,
-                  content_type: contentType
+                  content_type: contentType,
+                  message_id: data.data.message_id,
+                  is_edited: data.data.is_edited,
+                  edited_at: data.data.edited_at
               };
 
               const updatedConv = {
@@ -422,6 +425,26 @@ function App() {
               ];
 
               return [updatedConv, ...otherConvs];
+            });
+          }
+          // Handle in-place message edits (from both admin PATCH and client WhatsApp edits)
+          else if (data.update === 'message_edited' && data.data) {
+            setConversations(prevConversations => {
+              return prevConversations.map(conv => {
+                if (conv.composite_id !== data.composite_id) return conv;
+                return {
+                  ...conv,
+                  messages: conv.messages.map(msg => {
+                    if (msg.message_id !== data.data.message_id) return msg;
+                    return {
+                      ...msg,
+                      text: data.data.new_text,
+                      is_edited: true,
+                      edited_at: data.data.edited_at,
+                    };
+                  }),
+                };
+              });
             });
           }
           // ADDED 'conversation_closed' and 'status_changed' to catch bot closing events
@@ -516,6 +539,28 @@ function App() {
     } catch (err) {
         if (err.message !== 'Authentication failed') {
             setError("Failed to send message.");
+        }
+    }
+  };
+
+  const handleEditMessage = async (compositeId, messageId, newText) => {
+    try {
+        const response = await authFetch(
+            `${apiBaseUrl}/conversations/${compositeId}/messages/${encodeURIComponent(messageId)}`,
+            {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ new_text: newText }),
+            }
+        );
+        if (!response.ok) {
+            const err = await response.json();
+            setError(err.detail || 'Failed to edit message.');
+        }
+        // WebSocket will broadcast the update; no need to refetch
+    } catch (err) {
+        if (err.message !== 'Authentication failed') {
+            setError('Failed to edit message.');
         }
     }
   };
@@ -700,6 +745,7 @@ function App() {
                 <ChatWindow
                     conversation={selectedConversation}
                     onSendMessage={handleSendMessage}
+                    onEditMessage={handleEditMessage}
                     onMarkAsSolved={handleMarkAsSolved}
                     onInitiateTransfer={handleUpdateSupervisionType}
                     onTakeOver={handleTakeOverConversation}
