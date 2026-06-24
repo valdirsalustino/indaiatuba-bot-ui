@@ -79,7 +79,6 @@ function App() {
   const [activeView, setActiveView] = useState('conversations');
   const [departments, setDepartments] = useState([]);
   const [clientName, setClientName] = useState('');
-  const [industry, setIndustry] = useState(null);
   const [features, setFeatures] = useState({ enable_google_calendar_scheduling: false });
   const [showTopics, setShowTopics] = useState(false);
   const [showLeads, setShowLeads] = useState(false);
@@ -241,19 +240,6 @@ function App() {
         }
     } catch (error) {
         console.error("Failed to fetch client info:", error);
-    }
-  }, [token, apiBaseUrl, authFetch]);
-
-  const fetchIndustry = useCallback(async () => {
-    if (!token) return;
-    try {
-        const response = await authFetch(`${apiBaseUrl}/industry`);
-        if (response.ok) {
-            const data = await response.json();
-            setIndustry(data.industry);
-        }
-    } catch (error) {
-        console.error("Failed to fetch industry:", error);
     }
   }, [token, apiBaseUrl, authFetch]);
 
@@ -492,11 +478,10 @@ function App() {
     if (token && (activeView === 'conversations' || activeView === 'userManagement')) {
         fetchDepartments();
         fetchClientInfo();
-        fetchIndustry();
         fetchFeatures();
         fetchClassificationLabels();
     }
-  }, [token, activeView, fetchDepartments, fetchClientInfo, fetchIndustry, fetchFeatures, fetchClassificationLabels]);
+  }, [token, activeView, fetchDepartments, fetchClientInfo, fetchFeatures, fetchClassificationLabels]);
 
 
   const handleLogin = (newToken) => {

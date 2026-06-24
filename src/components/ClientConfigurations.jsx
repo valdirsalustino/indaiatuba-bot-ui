@@ -20,9 +20,6 @@ export default function ClientConfigurations({ apiBaseUrl, token, onAction }) {
     const [queueWaitingMessage, setQueueWaitingMessage] = useState('');
     const [originalQueueWaitingMessage, setOriginalQueueWaitingMessage] = useState('');
 
-    const [industry, setIndustry] = useState('Clubes');
-    const [originalIndustry, setOriginalIndustry] = useState('Clubes');
-    const [availableIndustries, setAvailableIndustries] = useState(['Clubes']);
     const [enableGoogleCalendarScheduling, setEnableGoogleCalendarScheduling] = useState(false);
     const [originalEnableGoogleCalendarScheduling, setOriginalEnableGoogleCalendarScheduling] = useState(false);
     const [enableLeadClassification, setEnableLeadClassification] = useState(false);
@@ -175,27 +172,6 @@ export default function ClientConfigurations({ apiBaseUrl, token, onAction }) {
                         throw new Error(errorData.detail || `Erro ao carregar mensagem da fila de espera: Status ${queueResponse.status}`);
                     } else {
                         setQueueWaitingMessage('');
-                    }
-
-                    const availableIndUrl = `/api/available-industries`;
-                    const availableIndResponse = await fetch(availableIndUrl, {
-                        method: 'GET',
-                        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
-                    });
-                    if (availableIndResponse.ok) {
-                        const indData = await availableIndResponse.json();
-                        setAvailableIndustries(indData || ['Clubes']);
-                    }
-
-                    const industryUrl = `${apiBaseUrl}/industry`;
-                    const industryResponse = await fetch(industryUrl, {
-                        method: 'GET',
-                        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
-                    });
-                    if (industryResponse.ok) {
-                        const indData = await industryResponse.json();
-                        setIndustry(indData.industry || 'Clubes');
-                        setOriginalIndustry(indData.industry || 'Clubes');
                     }
 
                     const featuresUrl = `${apiBaseUrl}/features`;
@@ -425,21 +401,6 @@ export default function ClientConfigurations({ apiBaseUrl, token, onAction }) {
                     throw new Error(errorData.detail || `Erro ao salvar Nome do Cliente: Status ${infoResponse.status}`);
                 }
                 setOriginalClientInfo({ name: clientName, website: website });
-            }
-
-            if (industry !== originalIndustry) {
-                const industryUrl = `${apiBaseUrl}/industry`;
-                const industryResponse = await fetch(industryUrl, {
-                    method: 'PUT',
-                    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ industry })
-                });
-
-                if (!industryResponse.ok) {
-                    const errorData = await industryResponse.json().catch(() => ({}));
-                    throw new Error(errorData.detail || `Erro ao salvar indústria: Status ${industryResponse.status}`);
-                }
-                setOriginalIndustry(industry);
             }
 
             if (enableGoogleCalendarScheduling !== originalEnableGoogleCalendarScheduling) {
@@ -1011,23 +972,6 @@ export default function ClientConfigurations({ apiBaseUrl, token, onAction }) {
                         {clientPromptError && <p className="text-red-500">{clientPromptError}</p>}
                         {!loadingClientPrompt && (
                             <div className="space-y-6">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Indústria (Tipo de Negócio)</label>
-                                    <select
-                                        value={industry}
-                                        onChange={(e) => {
-                                            const val = e.target.value;
-                                            setIndustry(val);
-                                        }}
-                                        disabled={!isEditingClientPrompt}
-                                        className={`w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 ${!isEditingClientPrompt ? 'bg-gray-100' : ''}`}
-                                    >
-                                        {availableIndustries.map((ind, idx) => (
-                                            <option key={idx} value={ind}>{ind}</option>
-                                        ))}
-                                    </select>
-                                </div>
-
                                 <div className="flex items-center space-x-2 pt-2">
                                     <input
                                         type="checkbox"
