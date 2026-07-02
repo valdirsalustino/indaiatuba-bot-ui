@@ -372,7 +372,16 @@ export default function ChatWindow({ conversation, onSendMessage, onEditMessage,
                                 {canEdit && !isBeingEdited && (
                                     <button
                                         title="Editar mensagem"
-                                        onClick={() => { setEditingMessageId(msg.message_id); setEditText(displayText); }}
+                                        onClick={() => {
+                                            setEditingMessageId(msg.message_id);
+                                            setEditText(displayText);
+                                            const isLastMessage = index === conversation.messages.length - 1;
+                                            if (isLastMessage) {
+                                                setTimeout(() => {
+                                                    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+                                                }, 100);
+                                            }
+                                        }}
                                         className="opacity-0 group-hover:opacity-100 transition-opacity duration-150 p-1 rounded hover:bg-black/10 text-gray-400 hover:text-gray-600"
                                     >
                                         <PencilIcon />
