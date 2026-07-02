@@ -1,7 +1,7 @@
 // src/components/ConversationList.jsx
 
 import React, { useState } from 'react';
-import UserIcon from './UserIcon';
+import Avatar from './Avatar';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
@@ -309,11 +309,11 @@ export default function ConversationList({
               onClick={() => onSelect(conv)}
               className={`flex items-center p-3 cursor-pointer transition-colors duration-200 relative border-b border-gray-100 ${bgClass}`}
             >
-              <div className="w-12 h-12 rounded-full mr-4 flex items-center justify-center bg-gray-200 flex-shrink-0">
-                  <UserIcon className="h-8 w-8 text-gray-500" />
+              <div className="relative mr-4 flex-shrink-0">
+                  <Avatar name={conv.user_name} seed={conv.phone_number} size="md" />
                   {/* Optional: Add a small red dot on the avatar if needs attention */}
                   {needsAttention && (
-                      <span className="absolute top-2 left-10 w-3 h-3 bg-red-500 border-2 border-white rounded-full"></span>
+                      <span className="absolute top-0 right-0 w-3 h-3 bg-red-500 border-2 border-white rounded-full"></span>
                   )}
               </div>
               <div className="flex-grow overflow-hidden">

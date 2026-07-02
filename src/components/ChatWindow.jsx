@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import UserIcon from './UserIcon.jsx';
+import Avatar from './Avatar.jsx';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import ReactQuill from 'react-quill-new';
@@ -171,7 +171,7 @@ export default function ChatWindow({ conversation, onSendMessage, onEditMessage,
     return (
       <div className="flex-grow flex items-center justify-center bg-gray-50">
         <div className="text-center text-gray-500">
-          <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center mx-auto mb-2"><UserIcon className="h-10 w-10 text-gray-400" /></div>
+          <Avatar size="lg" className="mx-auto mb-2" />
           <p className="mt-2 text-lg">Selecione um tópico de conversa</p>
         </div>
       </div>
@@ -188,7 +188,7 @@ export default function ChatWindow({ conversation, onSendMessage, onEditMessage,
     <div className="flex-grow flex flex-col bg-gray-100">
       <header className="flex items-center justify-between p-3 bg-white border-b border-gray-200 shadow-sm">
         <div className="flex items-center">
-            <div className="w-10 h-10 rounded-full mr-3 flex items-center justify-center bg-gray-200 flex-shrink-0"><UserIcon className="h-6 w-6 text-gray-500" /></div>
+            <Avatar name={conversation.user_name} seed={conversation.phone_number} size="sm" className="mr-3" />
             <div>
                 <div className="flex items-center">
                   <div className="flex flex-col">
