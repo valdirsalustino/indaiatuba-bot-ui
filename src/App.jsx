@@ -13,6 +13,7 @@ import Dashboard from './components/Dashboard.jsx';
 import CalendarIntegration from './components/CalendarIntegration.jsx';
 import OAuthCallback from './components/OAuthCallback.jsx';
 import AdminCalendarView from './components/AdminCalendarView.jsx';
+import TopNavbar from './components/TopNavbar.jsx';
 
 // Logic to determine WebSocket protocol
 const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -75,6 +76,7 @@ function App() {
   const [conversations, setConversations] = useState([]);
   const [selectedConversation, setSelectedConversation] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+  const isLoadingRef = useRef(false);
   const [error, setError] = useState(null);
   const [activeView, setActiveView] = useState('conversations');
   const [departments, setDepartments] = useState([]);
@@ -135,6 +137,7 @@ function App() {
   const fetchConversations = useCallback(async (currentSkip = 0, isLoadMore = false, topicParam = undefined, leadParam = undefined) => {
     if (!token) return;
     setIsLoading(true);
+    isLoadingRef.current = true;
     setError(null);
     try {
       const activeTopic = topicParam !== undefined ? topicParam : filterTopicRef.current;
@@ -214,6 +217,7 @@ function App() {
       }
     } finally {
       setIsLoading(false);
+      isLoadingRef.current = false;
     }
   }, [token, authFetch, apiBaseUrl]);
 
@@ -283,7 +287,8 @@ function App() {
 
   // Expose a loadMore function to pass to the ConversationList
   const loadMoreConversations = () => {
-    if (!isLoading && hasMore) {
+    if (!isLoadingRef.current && hasMore) {
+        isLoadingRef.current = true;
         const nextSkip = skip + LIMIT;
         setSkip(nextSkip);
         fetchConversations(nextSkip, true);
@@ -363,7 +368,21 @@ function App() {
             );
 
             if (!isKnownConversation) {
-              fetchConversations(0, false); // Refresh from top if a brand new thread comes in
+              // Instead of resetting the whole list (which breaks pagination),
+              // fetch just the new conversation and prepend it.
+              authFetch(`${apiBaseUrl}/conversations/${data.composite_id}`)
+                .then(res => {
+                   if (res.ok) return res.json();
+                   throw new Error('Failed to fetch new conversation');
+                })
+                .then(newConv => {
+                   setConversations(prev => {
+                       // Double check it wasn't added while we were fetching
+                       if (prev.some(c => c.composite_id === newConv.composite_id)) return prev;
+                       return [newConv, ...prev];
+                   });
+                })
+                .catch(err => console.error("Error fetching new conversation:", err));
               return;
             }
 
@@ -697,7 +716,7 @@ function App() {
     <Routes>
       <Route path="/calendar/callback" element={<OAuthCallback apiBaseUrl={apiBaseUrl} token={token} />} />
       <Route path="*" element={
-        <div className="h-screen w-screen bg-gray-200 flex font-sans antialiased text-gray-800">
+        <div className="h-screen w-screen bg-gray-50 flex flex-col font-sans antialiased text-gray-800 overflow-hidden">
           <ConfirmationModal
             isOpen={modalState.isOpen}
             onClose={() => setModalState({ ...modalState, isOpen: false })}
@@ -710,23 +729,30 @@ function App() {
             message={modalState.message}
             isAlert={modalState.isAlert}
           />
-          <div className="w-full h-full flex shadow-lg">
+          
+          <TopNavbar
+            onLogout={handleLogout}
+            isAdmin={currentUser.role === 'Admin'}
+            isDoctor={currentUser.role === 'Médico'}
+            isCalendarEnabled={isCalendarEnabled}
+            onShowUserManagement={() => setActiveView('userManagement')}
+            onShowClientConfigs={() => setActiveView('clientConfigurations')}
+            onShowDashboard={() => setActiveView('dashboard')}
+            onShowConversations={() => setActiveView('conversations')}
+            onShowCalendar={() => setActiveView('calendar')}
+            onShowAdminCalendar={() => setActiveView('adminCalendar')}
+            currentUser={currentUser}
+            clientName={clientName}
+            activeView={activeView}
+          />
+
+          <div className="w-full flex-grow flex overflow-hidden">
             {activeView !== 'dashboard' && (
               <ConversationList
                 conversations={conversations}
                 onSelect={handleSelectConversation}
                 selectedId={selectedConversation?.composite_id}
-                onLogout={handleLogout}
                 anyNeedsAttention={anyNeedsAttention}
-                isAdmin={currentUser.role === 'Admin'}
-                isDoctor={currentUser.role === 'Médico'}
-                isCalendarEnabled={isCalendarEnabled}
-                onShowUserManagement={() => setActiveView('userManagement')}
-                onShowClientConfigs={() => setActiveView('clientConfigurations')}
-                onShowDashboard={() => setActiveView('dashboard')}
-                onShowConversations={() => setActiveView('conversations')}
-                onShowCalendar={() => setActiveView('calendar')}
-                onShowAdminCalendar={() => setActiveView('adminCalendar')}
                 currentUser={currentUser}
                 onLoadMore={loadMoreConversations}
                 showTopics={showTopics}
