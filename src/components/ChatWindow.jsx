@@ -364,7 +364,7 @@ export default function ChatWindow({ conversation, onSendMessage, onEditMessage,
                                 {isBeingEdited ? (
                                     <div className="flex flex-col gap-2 mt-1">
                                         <textarea
-                                            className="w-full text-sm border border-blue-300 rounded-lg p-2 resize-none focus:outline-none focus:ring-2 focus:ring-blue-400"
+                                            className="w-full text-sm text-gray-800 bg-white border border-blue-300 rounded-lg p-2 resize-none focus:outline-none focus:ring-2 focus:ring-blue-400"
                                             rows={3}
                                             value={editText}
                                             onChange={e => setEditText(e.target.value)}
