@@ -43,9 +43,10 @@ export default function TopNavbar({
     clientName,
     activeView
 }) {
-    const NavButton = ({ onClick, icon, label, isActive }) => (
+    const NavButton = ({ onClick, icon, label, isActive, title }) => (
         <button 
             onClick={onClick} 
+            title={title}
             className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors font-medium text-sm
                 ${isActive 
                     ? 'bg-indigo-50 text-indigo-700' 
@@ -76,6 +77,7 @@ export default function TopNavbar({
                         onClick={onShowConversations} 
                         icon={<ChatIcon />} 
                         label="Atendimentos" 
+                        title="Central de atendimentos e conversas."
                         isActive={activeView === 'conversations'}
                     />
                     
@@ -84,6 +86,7 @@ export default function TopNavbar({
                             onClick={onShowDashboard} 
                             icon={<DashboardIcon />} 
                             label="Indicadores" 
+                            title="Métricas e estatísticas de desempenho."
                             isActive={activeView === 'dashboard'}
                         />
                     )}
@@ -93,6 +96,7 @@ export default function TopNavbar({
                             onClick={onShowAdminCalendar} 
                             icon={<CalendarIcon />} 
                             label="Agenda" 
+                            title="Calendário e agendamentos."
                             isActive={activeView === 'adminCalendar'}
                         />
                     )}
@@ -102,6 +106,7 @@ export default function TopNavbar({
                             onClick={onShowClientConfigs} 
                             icon={<SettingsIcon />} 
                             label="Ajustes" 
+                            title="Configurações gerais do sistema."
                             isActive={activeView === 'clientConfigurations'}
                         />
                     )}

@@ -123,8 +123,9 @@ export default function ConversationList({
     }).length;
   };
 
-  const TabButton = ({ name }) => (
+  const TabButton = ({ name, title }) => (
     <button
+      title={title}
       onClick={() => setActiveTab(name)}
       className={`flex-1 py-3 text-sm font-medium flex items-center justify-center space-x-2 border-b-2 transition-colors ${
         activeTab === name 
@@ -146,9 +147,18 @@ export default function ConversationList({
       
       {/* Tabs */}
       <div className="flex w-full border-b border-gray-200 bg-white">
-        <TabButton name="Novos" />
-        <TabButton name="Departamento" />
-        <TabButton name="Robô" />
+        <TabButton 
+          name="Novos" 
+          title="Todas as conversas ativas no momento, incluindo robô e assistentes." 
+        />
+        <TabButton 
+          name="Departamento" 
+          title="Conversas encerradas direcionadas ao seu departamento." 
+        />
+        <TabButton 
+          name="Robô" 
+          title="Conversas encerradas pelo Robô ou pelo Cliente que não precisaram de atendimento humano." 
+        />
       </div>
 
       {/* --- Collapsible Filter Panel — between header and search bar --- */}
