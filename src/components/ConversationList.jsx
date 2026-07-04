@@ -60,11 +60,12 @@ export default function ConversationList({
   classificationLabels = { topics: [], leads: [] },
   filterTopic = '',
   filterLead = '',
-  onFilterChange
+  onFilterChange,
+  activeTab = 'Novos',
+  setActiveTab
 }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [isFiltersOpen, setIsFiltersOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState('Novos');
 
   // Detect scroll reaching the bottom
   const handleScroll = (e) => {
@@ -123,24 +124,39 @@ export default function ConversationList({
     }).length;
   };
 
-  const TabButton = ({ name, title }) => (
-    <button
-      title={title}
-      onClick={() => setActiveTab(name)}
-      className={`flex-1 py-3 text-sm font-medium flex items-center justify-center space-x-2 border-b-2 transition-colors ${
-        activeTab === name 
-          ? 'border-indigo-600 text-indigo-600' 
-          : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-      }`}
-    >
-      <span>{name}</span>
-      <span className={`px-2 py-0.5 rounded-full text-xs ${
-        activeTab === name ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100 text-gray-600'
-      }`}>
-        {getTabCount(name)}
-      </span>
-    </button>
-  );
+  const TabButton = ({ name, title }) => {
+    const isNovosTab = name === 'Novos';
+    const isAlertState = isNovosTab && anyNeedsAttention;
+
+    return (
+      <button
+        title={title}
+        onClick={() => setActiveTab(name)}
+        className={`flex-1 py-3 text-sm font-medium flex items-center justify-center space-x-2 border-b-2 transition-colors relative ${
+          activeTab === name 
+            ? 'border-indigo-600 text-indigo-600' 
+            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+        }`}
+      >
+        <span className="relative flex items-center">
+            {name}
+            {isAlertState && activeTab !== 'Novos' && (
+                <span className="absolute -top-1 -right-2.5 flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                </span>
+            )}
+        </span>
+        <span className={`px-2 py-0.5 rounded-full text-xs transition-colors ${
+          isAlertState 
+            ? 'bg-red-100 text-red-700 font-bold shadow-sm' 
+            : activeTab === name ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100 text-gray-600'
+        }`}>
+          {getTabCount(name)}
+        </span>
+      </button>
+    );
+  };
 
   return (
     <div className="w-full md:w-[360px] lg:w-[400px] bg-white border-r border-gray-200 flex flex-col flex-shrink-0 z-0">

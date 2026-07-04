@@ -14,6 +14,7 @@ import CalendarIntegration from './components/CalendarIntegration.jsx';
 import OAuthCallback from './components/OAuthCallback.jsx';
 import AdminCalendarView from './components/AdminCalendarView.jsx';
 import TopNavbar from './components/TopNavbar.jsx';
+import { useToast } from './context/ToastContext.jsx';
 
 // Logic to determine WebSocket protocol
 const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -62,6 +63,7 @@ const getTenantFromUrl = () => {
 };
 
 function App() {
+  const { addToast } = useToast();
   const [tenant, setTenant] = useState(getTenantFromUrl());
 
   // Dynamic base URLs that include the tenant name
@@ -79,6 +81,7 @@ function App() {
   const isLoadingRef = useRef(false);
   const [error, setError] = useState(null);
   const [activeView, setActiveView] = useState('conversations');
+  const [activeTab, setActiveTab] = useState('Novos');
   const [departments, setDepartments] = useState([]);
   const [clientName, setClientName] = useState('');
   const [features, setFeatures] = useState({ enable_google_calendar_scheduling: false });
@@ -478,6 +481,36 @@ function App() {
               } catch (err) {
                 console.error("Erro ao tentar tocar o áudio:", err);
               }
+              
+              // Trigger Toast Notification
+              addToast("Um cliente solicitou atendimento humano", "alert", {
+                  label: "Acessar",
+                  onClick: async () => {
+                      setActiveView('conversations');
+                      setActiveTab('Novos');
+                      if (data.composite_id) {
+                          const targetConv = conversationsRef.current.find(c => c.composite_id === data.composite_id);
+                          if (targetConv) {
+                              handleSelectConversation(targetConv);
+                          } else {
+                              // If not in local state, fetch it securely before selecting
+                              try {
+                                  const res = await authFetch(`${apiBaseUrl}/conversations/${data.composite_id}`);
+                                  if (res.ok) {
+                                      const newConv = await res.json();
+                                      setConversations(prev => {
+                                          if (prev.some(c => c.composite_id === newConv.composite_id)) return prev;
+                                          return [newConv, ...prev];
+                                      });
+                                      handleSelectConversation(newConv);
+                                  }
+                              } catch (err) {
+                                  console.error("Failed to fetch handoff conversation", err);
+                              }
+                          }
+                      }
+                  }
+              });
             }
             fetchConversations(0, false);
           }
@@ -501,7 +534,7 @@ function App() {
 
     return () => {
         clearTimeout(reconnectTimeout);
-        if (ws && ws.readyState === 1) {
+        if (ws) {
             ws.close();
         }
     };
@@ -749,6 +782,8 @@ function App() {
           <div className="w-full flex-grow flex overflow-hidden">
             {activeView !== 'dashboard' && (
               <ConversationList
+                activeTab={activeTab}
+                setActiveTab={setActiveTab}
                 conversations={conversations}
                 onSelect={handleSelectConversation}
                 selectedId={selectedConversation?.composite_id}
