@@ -19,6 +19,8 @@ export default function ClientConfigurations({ apiBaseUrl, token, onAction }) {
     const [originalWelcomeMessage, setOriginalWelcomeMessage] = useState('');
     const [queueWaitingMessage, setQueueWaitingMessage] = useState('');
     const [originalQueueWaitingMessage, setOriginalQueueWaitingMessage] = useState('');
+    const [staleTimeout, setStaleTimeout] = useState(10);
+    const [originalStaleTimeout, setOriginalStaleTimeout] = useState(10);
 
     const [enableGoogleCalendarScheduling, setEnableGoogleCalendarScheduling] = useState(false);
     const [originalEnableGoogleCalendarScheduling, setOriginalEnableGoogleCalendarScheduling] = useState(false);
@@ -92,136 +94,106 @@ export default function ClientConfigurations({ apiBaseUrl, token, onAction }) {
                 setLoadingClientPrompt(true);
                 setClientPromptError('');
                 try {
-                    const infoUrl = `${apiBaseUrl}/client-info`;
-                    const infoResponse = await fetch(infoUrl, {
-                        method: 'GET',
-                        headers: {
-                            'Authorization': `Bearer ${token}`,
-                            'Content-Type': 'application/json'
-                        }
-                    });
+                    const headers = {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    };
+                    
+                    const [
+                        infoRes, promptRes, welcomeRes, queueRes, 
+                        staleTimeoutRes, featuresRes, leadPromptRes, topicsRes
+                    ] = await Promise.all([
+                        fetch(`${apiBaseUrl}/client-info`, { method: 'GET', headers }),
+                        fetch(`${apiBaseUrl}/system-prompt`, { method: 'GET', headers }),
+                        fetch(`${apiBaseUrl}/welcome-message`, { method: 'GET', headers }),
+                        fetch(`${apiBaseUrl}/queue-waiting-message`, { method: 'GET', headers }),
+                        fetch(`${apiBaseUrl}/stale-timeout`, { method: 'GET', headers }),
+                        fetch(`${apiBaseUrl}/features`, { method: 'GET', headers }),
+                        fetch(`${apiBaseUrl}/lead-classification-prompt`, { method: 'GET', headers }),
+                        fetch(`${apiBaseUrl}/topic-classification`, { method: 'GET', headers })
+                    ]);
 
-                    if (infoResponse.ok) {
-                        const infoData = await infoResponse.json();
+                    if (infoRes.ok) {
+                        const infoData = await infoRes.json();
                         setClientName(infoData.client_name || '');
                         setWebsite(infoData.website || '');
                         setOriginalClientInfo({ name: infoData.client_name || '', website: infoData.website || '' });
-                    } else if (infoResponse.status !== 404) {
-                        const errorData = await infoResponse.json().catch(() => ({}));
-                        throw new Error(errorData.detail || `Erro ao carregar Info do Cliente: Status ${infoResponse.status}`);
+                    } else if (infoRes.status !== 404) {
+                        const errorData = await infoRes.json().catch(() => ({}));
+                        throw new Error(errorData.detail || `Erro ao carregar Info do Cliente: Status ${infoRes.status}`);
                     } else {
                         setClientName('');
                         setWebsite('');
                     }
 
-                    const promptUrl = `${apiBaseUrl}/system-prompt`;
-                    const promptResponse = await fetch(promptUrl, {
-                        method: 'GET',
-                        headers: {
-                            'Authorization': `Bearer ${token}`,
-                            'Content-Type': 'application/json'
-                        }
-                    });
-
-                    if (promptResponse.ok) {
-                        const promptData = await promptResponse.json();
+                    if (promptRes.ok) {
+                        const promptData = await promptRes.json();
                         setSystemPrompt(promptData.prompt || '');
                         setOriginalSystemPrompt(promptData.prompt || '');
-                    } else if (promptResponse.status !== 404) {
-                        const errorData = await promptResponse.json().catch(() => ({}));
-                        throw new Error(errorData.detail || `Erro ao carregar prompt: Status ${promptResponse.status}`);
+                    } else if (promptRes.status !== 404) {
+                        const errorData = await promptRes.json().catch(() => ({}));
+                        throw new Error(errorData.detail || `Erro ao carregar prompt: Status ${promptRes.status}`);
                     } else {
                         setSystemPrompt('');
                     }
 
-                    const welcomeUrl = `${apiBaseUrl}/welcome-message`;
-                    const welcomeResponse = await fetch(welcomeUrl, {
-                        method: 'GET',
-                        headers: {
-                            'Authorization': `Bearer ${token}`,
-                            'Content-Type': 'application/json'
-                        }
-                    });
-
-                    if (welcomeResponse.ok) {
-                        const welcomeData = await welcomeResponse.json();
+                    if (welcomeRes.ok) {
+                        const welcomeData = await welcomeRes.json();
                         setWelcomeMessage(welcomeData.message || '');
                         setOriginalWelcomeMessage(welcomeData.message || '');
-                    } else if (welcomeResponse.status !== 404) {
-                        const errorData = await welcomeResponse.json().catch(() => ({}));
-                        throw new Error(errorData.detail || `Erro ao carregar mensagem de saudação: Status ${welcomeResponse.status}`);
+                    } else if (welcomeRes.status !== 404) {
+                        const errorData = await welcomeRes.json().catch(() => ({}));
+                        throw new Error(errorData.detail || `Erro ao carregar mensagem de saudação: Status ${welcomeRes.status}`);
                     } else {
                         setWelcomeMessage('');
                     }
 
-                    const queueUrl = `${apiBaseUrl}/queue-waiting-message`;
-                    const queueResponse = await fetch(queueUrl, {
-                        method: 'GET',
-                        headers: {
-                            'Authorization': `Bearer ${token}`,
-                            'Content-Type': 'application/json'
-                        }
-                    });
-
-                    if (queueResponse.ok) {
-                        const queueData = await queueResponse.json();
+                    if (queueRes.ok) {
+                        const queueData = await queueRes.json();
                         setQueueWaitingMessage(queueData.message || '');
                         setOriginalQueueWaitingMessage(queueData.message || '');
-                    } else if (queueResponse.status !== 404) {
-                        const errorData = await queueResponse.json().catch(() => ({}));
-                        throw new Error(errorData.detail || `Erro ao carregar mensagem da fila de espera: Status ${queueResponse.status}`);
+                    } else if (queueRes.status !== 404) {
+                        const errorData = await queueRes.json().catch(() => ({}));
+                        throw new Error(errorData.detail || `Erro ao carregar mensagem da fila de espera: Status ${queueRes.status}`);
                     } else {
                         setQueueWaitingMessage('');
                     }
 
-                    const featuresUrl = `${apiBaseUrl}/features`;
-                    const featuresResponse = await fetch(featuresUrl, {
-                        method: 'GET',
-                        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
-                    });
-                    if (featuresResponse.ok) {
-                        const featData = await featuresResponse.json();
+                    if (staleTimeoutRes.ok) {
+                        const timeoutData = await staleTimeoutRes.json();
+                        setStaleTimeout(timeoutData.minutes || 10);
+                        setOriginalStaleTimeout(timeoutData.minutes || 10);
+                    } else if (staleTimeoutRes.status !== 404) {
+                        const errorData = await staleTimeoutRes.json().catch(() => ({}));
+                        throw new Error(errorData.detail || `Erro ao carregar período de espera: Status ${staleTimeoutRes.status}`);
+                    } else {
+                        setStaleTimeout(10);
+                    }
+
+                    if (featuresRes.ok) {
+                        const featData = await featuresRes.json();
                         setEnableGoogleCalendarScheduling(featData.enable_google_calendar_scheduling || false);
                         setOriginalEnableGoogleCalendarScheduling(featData.enable_google_calendar_scheduling || false);
                         setEnableLeadClassification(featData.enable_lead_classification || false);
                     }
 
-                    const leadPromptUrl = `${apiBaseUrl}/lead-classification-prompt`;
-                    const leadPromptResponse = await fetch(leadPromptUrl, {
-                        method: 'GET',
-                        headers: {
-                            'Authorization': `Bearer ${token}`,
-                            'Content-Type': 'application/json'
-                        }
-                    });
-
-                    if (leadPromptResponse.ok) {
-                        const leadPromptData = await leadPromptResponse.json();
+                    if (leadPromptRes.ok) {
+                        const leadPromptData = await leadPromptRes.json();
                         setLeadClassificationPrompt(leadPromptData.prompt || '');
                         setOriginalLeadClassificationPrompt(leadPromptData.prompt || '');
-                    } else if (leadPromptResponse.status !== 404) {
-                        const errorData = await leadPromptResponse.json().catch(() => ({}));
-                        throw new Error(errorData.detail || `Erro ao carregar prompt de lead: Status ${leadPromptResponse.status}`);
+                    } else if (leadPromptRes.status !== 404) {
+                        const errorData = await leadPromptRes.json().catch(() => ({}));
+                        throw new Error(errorData.detail || `Erro ao carregar prompt de lead: Status ${leadPromptRes.status}`);
                     } else {
                         setLeadClassificationPrompt('');
                     }
 
-
-                    const topicsUrl = `${apiBaseUrl}/topic-classification`;
-                    const topicsResponse = await fetch(topicsUrl, {
-                        method: 'GET',
-                        headers: {
-                            'Authorization': `Bearer ${token}`,
-                            'Content-Type': 'application/json'
-                        }
-                    });
-
-                    if (topicsResponse.ok) {
-                        const topicsData = await topicsResponse.json();
+                    if (topicsRes.ok) {
+                        const topicsData = await topicsRes.json();
                         setTopics(Array.isArray(topicsData) ? topicsData : []);
-                    } else if (topicsResponse.status !== 404) {
-                        const errorData = await topicsResponse.json().catch(() => ({}));
-                        throw new Error(errorData.detail || `Erro ao carregar tópicos: Status ${topicsResponse.status}`);
+                    } else if (topicsRes.status !== 404) {
+                        const errorData = await topicsRes.json().catch(() => ({}));
+                        throw new Error(errorData.detail || `Erro ao carregar tópicos: Status ${topicsRes.status}`);
                     } else {
                         setTopics([]);
                     }
@@ -462,6 +434,21 @@ export default function ClientConfigurations({ apiBaseUrl, token, onAction }) {
                     throw new Error(errorData.detail || `Erro ao salvar mensagem da fila de espera: Status ${queueResponse.status}`);
                 }
                 setOriginalQueueWaitingMessage(queueWaitingMessage);
+            }
+
+            if (staleTimeout !== originalStaleTimeout) {
+                const staleTimeoutUrl = `${apiBaseUrl}/stale-timeout`;
+                const staleTimeoutResponse = await fetch(staleTimeoutUrl, {
+                    method: 'PUT',
+                    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ minutes: parseInt(staleTimeout, 10) || 1 })
+                });
+
+                if (!staleTimeoutResponse.ok) {
+                    const errorData = await staleTimeoutResponse.json().catch(() => ({}));
+                    throw new Error(errorData.detail || `Erro ao salvar período de espera: Status ${staleTimeoutResponse.status}`);
+                }
+                setOriginalStaleTimeout(staleTimeout);
             }
 
             setIsEditingClientPrompt(false);
@@ -1043,6 +1030,26 @@ export default function ClientConfigurations({ apiBaseUrl, token, onAction }) {
                                         readOnly={!isEditingClientPrompt}
                                         className={`w-full h-32 p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 resize-y overflow-auto ${!isEditingClientPrompt ? 'bg-gray-100' : ''}`}
                                         placeholder="Nenhuma mensagem da fila de espera."
+                                    />
+                                </div>
+
+                                <div>
+                                    <h4 className="text-lg font-semibold text-gray-700 mb-2">Período de espera em minutos (inatividade)</h4>
+                                    <input
+                                        type="number"
+                                        min="1"
+                                        step="1"
+                                        value={staleTimeout}
+                                        onChange={(e) => {
+                                            let val = e.target.value;
+                                            if (val !== '') {
+                                                val = Math.max(1, parseInt(val, 10) || 1);
+                                            }
+                                            setStaleTimeout(val);
+                                        }}
+                                        readOnly={!isEditingClientPrompt}
+                                        className={`w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 ${!isEditingClientPrompt ? 'bg-gray-100' : 'bg-white'}`}
+                                        placeholder="Minutos de inatividade"
                                     />
                                 </div>
                                 
