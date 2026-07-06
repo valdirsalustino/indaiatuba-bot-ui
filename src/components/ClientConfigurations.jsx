@@ -19,11 +19,19 @@ export default function ClientConfigurations({ apiBaseUrl, token, onAction }) {
     const [originalWelcomeMessage, setOriginalWelcomeMessage] = useState('');
     const [queueWaitingMessage, setQueueWaitingMessage] = useState('');
     const [originalQueueWaitingMessage, setOriginalQueueWaitingMessage] = useState('');
+    const [timeoutMessage, setTimeoutMessage] = useState('');
+    const [originalTimeoutMessage, setOriginalTimeoutMessage] = useState('');
+    const [staleTimeout, setStaleTimeout] = useState(10);
+    const [originalStaleTimeout, setOriginalStaleTimeout] = useState(10);
 
-    // --- Industry States ---
-    const [industry, setIndustry] = useState('Clubes');
-    const [originalIndustry, setOriginalIndustry] = useState('Clubes');
-    const [availableIndustries, setAvailableIndustries] = useState(['Clubes']);
+    const [enableGoogleCalendarScheduling, setEnableGoogleCalendarScheduling] = useState(false);
+    const [originalEnableGoogleCalendarScheduling, setOriginalEnableGoogleCalendarScheduling] = useState(false);
+    const [enableLeadClassification, setEnableLeadClassification] = useState(false);
+    const [leadClassificationPrompt, setLeadClassificationPrompt] = useState('');
+    const [originalLeadClassificationPrompt, setOriginalLeadClassificationPrompt] = useState('');
+    const [isEditingLeadPrompt, setIsEditingLeadPrompt] = useState(false);
+    const [savingLeadPrompt, setSavingLeadPrompt] = useState(false);
+
 
     // --- Topics States ---
     const [topics, setTopics] = useState([]);
@@ -88,124 +96,118 @@ export default function ClientConfigurations({ apiBaseUrl, token, onAction }) {
                 setLoadingClientPrompt(true);
                 setClientPromptError('');
                 try {
-                    const infoUrl = `${apiBaseUrl}/client-info`;
-                    const infoResponse = await fetch(infoUrl, {
-                        method: 'GET',
-                        headers: {
-                            'Authorization': `Bearer ${token}`,
-                            'Content-Type': 'application/json'
-                        }
-                    });
+                    const headers = {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    };
+                    
+                    const [
+                        infoRes, promptRes, welcomeRes, queueRes, timeoutRes, 
+                        staleTimeoutRes, featuresRes, leadPromptRes, topicsRes
+                    ] = await Promise.all([
+                        fetch(`${apiBaseUrl}/client-info`, { method: 'GET', headers }),
+                        fetch(`${apiBaseUrl}/system-prompt`, { method: 'GET', headers }),
+                        fetch(`${apiBaseUrl}/welcome-message`, { method: 'GET', headers }),
+                        fetch(`${apiBaseUrl}/queue-waiting-message`, { method: 'GET', headers }),
+                        fetch(`${apiBaseUrl}/timeout-message`, { method: 'GET', headers }),
+                        fetch(`${apiBaseUrl}/stale-timeout`, { method: 'GET', headers }),
+                        fetch(`${apiBaseUrl}/features`, { method: 'GET', headers }),
+                        fetch(`${apiBaseUrl}/lead-classification-prompt`, { method: 'GET', headers }),
+                        fetch(`${apiBaseUrl}/topic-classification`, { method: 'GET', headers })
+                    ]);
 
-                    if (infoResponse.ok) {
-                        const infoData = await infoResponse.json();
+                    if (infoRes.ok) {
+                        const infoData = await infoRes.json();
                         setClientName(infoData.client_name || '');
                         setWebsite(infoData.website || '');
                         setOriginalClientInfo({ name: infoData.client_name || '', website: infoData.website || '' });
-                    } else if (infoResponse.status !== 404) {
-                        const errorData = await infoResponse.json().catch(() => ({}));
-                        throw new Error(errorData.detail || `Erro ao carregar Info do Cliente: Status ${infoResponse.status}`);
+                    } else if (infoRes.status !== 404) {
+                        const errorData = await infoRes.json().catch(() => ({}));
+                        throw new Error(errorData.detail || `Erro ao carregar Info do Cliente: Status ${infoRes.status}`);
                     } else {
                         setClientName('');
                         setWebsite('');
                     }
 
-                    const promptUrl = `${apiBaseUrl}/system-prompt`;
-                    const promptResponse = await fetch(promptUrl, {
-                        method: 'GET',
-                        headers: {
-                            'Authorization': `Bearer ${token}`,
-                            'Content-Type': 'application/json'
-                        }
-                    });
-
-                    if (promptResponse.ok) {
-                        const promptData = await promptResponse.json();
+                    if (promptRes.ok) {
+                        const promptData = await promptRes.json();
                         setSystemPrompt(promptData.prompt || '');
                         setOriginalSystemPrompt(promptData.prompt || '');
-                    } else if (promptResponse.status !== 404) {
-                        const errorData = await promptResponse.json().catch(() => ({}));
-                        throw new Error(errorData.detail || `Erro ao carregar prompt: Status ${promptResponse.status}`);
+                    } else if (promptRes.status !== 404) {
+                        const errorData = await promptRes.json().catch(() => ({}));
+                        throw new Error(errorData.detail || `Erro ao carregar prompt: Status ${promptRes.status}`);
                     } else {
                         setSystemPrompt('');
                     }
 
-                    const welcomeUrl = `${apiBaseUrl}/welcome-message`;
-                    const welcomeResponse = await fetch(welcomeUrl, {
-                        method: 'GET',
-                        headers: {
-                            'Authorization': `Bearer ${token}`,
-                            'Content-Type': 'application/json'
-                        }
-                    });
-
-                    if (welcomeResponse.ok) {
-                        const welcomeData = await welcomeResponse.json();
+                    if (welcomeRes.ok) {
+                        const welcomeData = await welcomeRes.json();
                         setWelcomeMessage(welcomeData.message || '');
                         setOriginalWelcomeMessage(welcomeData.message || '');
-                    } else if (welcomeResponse.status !== 404) {
-                        const errorData = await welcomeResponse.json().catch(() => ({}));
-                        throw new Error(errorData.detail || `Erro ao carregar mensagem de saudação: Status ${welcomeResponse.status}`);
+                    } else if (welcomeRes.status !== 404) {
+                        const errorData = await welcomeRes.json().catch(() => ({}));
+                        throw new Error(errorData.detail || `Erro ao carregar mensagem de saudação: Status ${welcomeRes.status}`);
                     } else {
                         setWelcomeMessage('');
                     }
 
-                    const queueUrl = `${apiBaseUrl}/queue-waiting-message`;
-                    const queueResponse = await fetch(queueUrl, {
-                        method: 'GET',
-                        headers: {
-                            'Authorization': `Bearer ${token}`,
-                            'Content-Type': 'application/json'
-                        }
-                    });
-
-                    if (queueResponse.ok) {
-                        const queueData = await queueResponse.json();
+                    if (queueRes.ok) {
+                        const queueData = await queueRes.json();
                         setQueueWaitingMessage(queueData.message || '');
                         setOriginalQueueWaitingMessage(queueData.message || '');
-                    } else if (queueResponse.status !== 404) {
-                        const errorData = await queueResponse.json().catch(() => ({}));
-                        throw new Error(errorData.detail || `Erro ao carregar mensagem da fila de espera: Status ${queueResponse.status}`);
+                    } else if (queueRes.status !== 404) {
+                        const errorData = await queueRes.json().catch(() => ({}));
+                        throw new Error(errorData.detail || `Erro ao carregar mensagem da fila de espera: Status ${queueRes.status}`);
                     } else {
                         setQueueWaitingMessage('');
                     }
 
-                    const availableIndUrl = `/api/available-industries`;
-                    const availableIndResponse = await fetch(availableIndUrl, {
-                        method: 'GET',
-                        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
-                    });
-                    if (availableIndResponse.ok) {
-                        const indData = await availableIndResponse.json();
-                        setAvailableIndustries(indData || ['Clubes']);
+                    if (timeoutRes.ok) {
+                        const timeoutMsgData = await timeoutRes.json();
+                        setTimeoutMessage(timeoutMsgData.message || '');
+                        setOriginalTimeoutMessage(timeoutMsgData.message || '');
+                    } else if (timeoutRes.status !== 404) {
+                        const errorData = await timeoutRes.json().catch(() => ({}));
+                        throw new Error(errorData.detail || `Erro ao carregar mensagem de inatividade: Status ${timeoutRes.status}`);
+                    } else {
+                        setTimeoutMessage('');
                     }
 
-                    const industryUrl = `${apiBaseUrl}/industry`;
-                    const industryResponse = await fetch(industryUrl, {
-                        method: 'GET',
-                        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
-                    });
-                    if (industryResponse.ok) {
-                        const indData = await industryResponse.json();
-                        setIndustry(indData.industry || 'Clubes');
-                        setOriginalIndustry(indData.industry || 'Clubes');
+                    if (staleTimeoutRes.ok) {
+                        const timeoutData = await staleTimeoutRes.json();
+                        setStaleTimeout(timeoutData.minutes || 10);
+                        setOriginalStaleTimeout(timeoutData.minutes || 10);
+                    } else if (staleTimeoutRes.status !== 404) {
+                        const errorData = await staleTimeoutRes.json().catch(() => ({}));
+                        throw new Error(errorData.detail || `Erro ao carregar período de espera: Status ${staleTimeoutRes.status}`);
+                    } else {
+                        setStaleTimeout(10);
                     }
 
-                    const topicsUrl = `${apiBaseUrl}/topic-classification`;
-                    const topicsResponse = await fetch(topicsUrl, {
-                        method: 'GET',
-                        headers: {
-                            'Authorization': `Bearer ${token}`,
-                            'Content-Type': 'application/json'
-                        }
-                    });
+                    if (featuresRes.ok) {
+                        const featData = await featuresRes.json();
+                        setEnableGoogleCalendarScheduling(featData.enable_google_calendar_scheduling || false);
+                        setOriginalEnableGoogleCalendarScheduling(featData.enable_google_calendar_scheduling || false);
+                        setEnableLeadClassification(featData.enable_lead_classification || false);
+                    }
 
-                    if (topicsResponse.ok) {
-                        const topicsData = await topicsResponse.json();
+                    if (leadPromptRes.ok) {
+                        const leadPromptData = await leadPromptRes.json();
+                        setLeadClassificationPrompt(leadPromptData.prompt || '');
+                        setOriginalLeadClassificationPrompt(leadPromptData.prompt || '');
+                    } else if (leadPromptRes.status !== 404) {
+                        const errorData = await leadPromptRes.json().catch(() => ({}));
+                        throw new Error(errorData.detail || `Erro ao carregar prompt de lead: Status ${leadPromptRes.status}`);
+                    } else {
+                        setLeadClassificationPrompt('');
+                    }
+
+                    if (topicsRes.ok) {
+                        const topicsData = await topicsRes.json();
                         setTopics(Array.isArray(topicsData) ? topicsData : []);
-                    } else if (topicsResponse.status !== 404) {
-                        const errorData = await topicsResponse.json().catch(() => ({}));
-                        throw new Error(errorData.detail || `Erro ao carregar tópicos: Status ${topicsResponse.status}`);
+                    } else if (topicsRes.status !== 404) {
+                        const errorData = await topicsRes.json().catch(() => ({}));
+                        throw new Error(errorData.detail || `Erro ao carregar tópicos: Status ${topicsRes.status}`);
                     } else {
                         setTopics([]);
                     }
@@ -387,20 +389,21 @@ export default function ClientConfigurations({ apiBaseUrl, token, onAction }) {
                 setOriginalClientInfo({ name: clientName, website: website });
             }
 
-            if (industry !== originalIndustry) {
-                const industryUrl = `${apiBaseUrl}/industry`;
-                const industryResponse = await fetch(industryUrl, {
+            if (enableGoogleCalendarScheduling !== originalEnableGoogleCalendarScheduling) {
+                const featuresUrl = `${apiBaseUrl}/features`;
+                const featuresResponse = await fetch(featuresUrl, {
                     method: 'PUT',
                     headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ industry })
+                    body: JSON.stringify({ enable_google_calendar_scheduling: enableGoogleCalendarScheduling })
                 });
 
-                if (!industryResponse.ok) {
-                    const errorData = await industryResponse.json().catch(() => ({}));
-                    throw new Error(errorData.detail || `Erro ao salvar indústria: Status ${industryResponse.status}`);
+                if (!featuresResponse.ok) {
+                    const errorData = await featuresResponse.json().catch(() => ({}));
+                    throw new Error(errorData.detail || `Erro ao salvar recursos: Status ${featuresResponse.status}`);
                 }
-                setOriginalIndustry(industry);
+                setOriginalEnableGoogleCalendarScheduling(enableGoogleCalendarScheduling);
             }
+
 
             if (systemPrompt !== originalSystemPrompt) {
                 const promptUrl = `${apiBaseUrl}/system-prompt`;
@@ -447,11 +450,67 @@ export default function ClientConfigurations({ apiBaseUrl, token, onAction }) {
                 setOriginalQueueWaitingMessage(queueWaitingMessage);
             }
 
+            if (timeoutMessage !== originalTimeoutMessage) {
+                const timeoutUrl = `${apiBaseUrl}/timeout-message`;
+                const timeoutResponse = await fetch(timeoutUrl, {
+                    method: 'PUT',
+                    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: timeoutMessage })
+                });
+
+                if (!timeoutResponse.ok) {
+                    const errorData = await timeoutResponse.json().catch(() => ({}));
+                    throw new Error(errorData.detail || `Erro ao salvar mensagem de inatividade: Status ${timeoutResponse.status}`);
+                }
+                setOriginalTimeoutMessage(timeoutMessage);
+            }
+
+            if (staleTimeout !== originalStaleTimeout) {
+                const staleTimeoutUrl = `${apiBaseUrl}/stale-timeout`;
+                const staleTimeoutResponse = await fetch(staleTimeoutUrl, {
+                    method: 'PUT',
+                    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ minutes: parseInt(staleTimeout, 10) || 1 })
+                });
+
+                if (!staleTimeoutResponse.ok) {
+                    const errorData = await staleTimeoutResponse.json().catch(() => ({}));
+                    throw new Error(errorData.detail || `Erro ao salvar período de espera: Status ${staleTimeoutResponse.status}`);
+                }
+                setOriginalStaleTimeout(staleTimeout);
+            }
+
             setIsEditingClientPrompt(false);
         } catch (error) {
             setClientPromptError(error.message || 'Falha ao salvar dados.');
         } finally {
             setSavingClientPrompt(false);
+        }
+    };
+
+    const handleSaveLeadPrompt = async () => {
+        setSavingLeadPrompt(true);
+        setClientPromptError('');
+        try {
+            if (leadClassificationPrompt !== originalLeadClassificationPrompt) {
+                const promptUrl = `${apiBaseUrl}/lead-classification-prompt`;
+                const promptResponse = await fetch(promptUrl, {
+                    method: 'PUT',
+                    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prompt: leadClassificationPrompt })
+                });
+
+                if (!promptResponse.ok) {
+                    const errorData = await promptResponse.json().catch(() => ({}));
+                    throw new Error(errorData.detail || `Erro ao salvar prompt de lead: Status ${promptResponse.status}`);
+                }
+                setOriginalLeadClassificationPrompt(leadClassificationPrompt);
+            }
+            setIsEditingLeadPrompt(false);
+        } catch (error) {
+            setClientPromptError(error.message || 'Falha ao salvar prompt de lead.');
+        } finally {
+            setSavingLeadPrompt(false);
         }
     };
 
@@ -929,19 +988,34 @@ export default function ClientConfigurations({ apiBaseUrl, token, onAction }) {
                         {clientPromptError && <p className="text-red-500">{clientPromptError}</p>}
                         {!loadingClientPrompt && (
                             <div className="space-y-6">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Indústria (Tipo de Negócio)</label>
-                                    <select
-                                        value={industry}
-                                        onChange={(e) => setIndustry(e.target.value)}
-                                        disabled={!isEditingClientPrompt}
-                                        className={`w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 ${!isEditingClientPrompt ? 'bg-gray-100' : ''}`}
-                                    >
-                                        {availableIndustries.map((ind, idx) => (
-                                            <option key={idx} value={ind}>{ind}</option>
-                                        ))}
-                                    </select>
+                                <div className="flex items-center space-x-2 pt-2">
+                                    <input
+                                        type="checkbox"
+                                        id="enableGoogleCalendarScheduling"
+                                        checked={enableGoogleCalendarScheduling}
+                                        onChange={() => {}}
+                                        disabled={true}
+                                        className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 disabled:opacity-50 cursor-not-allowed"
+                                    />
+                                    <label htmlFor="enableGoogleCalendarScheduling" className="text-sm font-medium text-gray-400 select-none cursor-not-allowed">
+                                        Habilitar Agendamento de Consultas (Google Calendar)
+                                    </label>
                                 </div>
+
+                                <div className="flex items-center space-x-2 pt-2">
+                                    <input
+                                        type="checkbox"
+                                        id="enableLeadClassification"
+                                        checked={enableLeadClassification}
+                                        onChange={() => {}}
+                                        disabled={true}
+                                        className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 disabled:opacity-50 cursor-not-allowed"
+                                    />
+                                    <label htmlFor="enableLeadClassification" className="text-sm font-medium text-gray-400 select-none cursor-not-allowed">
+                                        Habilitar Classificação de Leads
+                                    </label>
+                                </div>
+
 
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">Nome do Cliente</label>
@@ -985,6 +1059,37 @@ export default function ClientConfigurations({ apiBaseUrl, token, onAction }) {
                                         readOnly={!isEditingClientPrompt}
                                         className={`w-full h-32 p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 resize-y overflow-auto ${!isEditingClientPrompt ? 'bg-gray-100' : ''}`}
                                         placeholder="Nenhuma mensagem da fila de espera."
+                                    />
+                                </div>
+
+                                <div>
+                                    <h4 className="text-lg font-semibold text-gray-700 mb-2">Mensagem de Encerramento por Inatividade</h4>
+                                    <textarea
+                                        value={timeoutMessage}
+                                        onChange={(e) => setTimeoutMessage(e.target.value)}
+                                        readOnly={!isEditingClientPrompt}
+                                        className={`w-full h-32 p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 resize-y overflow-auto ${!isEditingClientPrompt ? 'bg-gray-100' : ''}`}
+                                        placeholder="Nenhuma mensagem de encerramento por inatividade."
+                                    />
+                                </div>
+
+                                <div>
+                                    <h4 className="text-lg font-semibold text-gray-700 mb-2">Período de espera em minutos (inatividade)</h4>
+                                    <input
+                                        type="number"
+                                        min="1"
+                                        step="1"
+                                        value={staleTimeout}
+                                        onChange={(e) => {
+                                            let val = e.target.value;
+                                            if (val !== '') {
+                                                val = Math.max(1, parseInt(val, 10) || 1);
+                                            }
+                                            setStaleTimeout(val);
+                                        }}
+                                        readOnly={!isEditingClientPrompt}
+                                        className={`w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 ${!isEditingClientPrompt ? 'bg-gray-100' : 'bg-white'}`}
+                                        placeholder="Minutos de inatividade"
                                     />
                                 </div>
                                 
@@ -1060,6 +1165,41 @@ export default function ClientConfigurations({ apiBaseUrl, token, onAction }) {
                                         <div id="topics-end" />
                                     </div>
                                 </div>
+
+                                {enableLeadClassification && (
+                                    <div className="mt-8 border-t border-gray-200 pt-6">
+                                        <div className="flex justify-between items-center mb-4">
+                                            <h4 className="text-lg font-semibold text-gray-700">Classificação das Leads</h4>
+                                            <div>
+                                                {!isEditingLeadPrompt ? (
+                                                    <button
+                                                        onClick={() => setIsEditingLeadPrompt(true)}
+                                                        className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 focus:outline-none"
+                                                    >
+                                                        Editar
+                                                    </button>
+                                                ) : (
+                                                    <button
+                                                        onClick={handleSaveLeadPrompt}
+                                                        disabled={savingLeadPrompt}
+                                                        className={`px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 focus:outline-none ${savingLeadPrompt ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                                    >
+                                                        {savingLeadPrompt ? 'Salvando...' : 'Salvar'}
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <textarea
+                                                value={leadClassificationPrompt}
+                                                onChange={(e) => setLeadClassificationPrompt(e.target.value)}
+                                                readOnly={!isEditingLeadPrompt}
+                                                className={`w-full h-64 p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 resize-y overflow-auto ${!isEditingLeadPrompt ? 'bg-gray-100' : ''}`}
+                                                placeholder="Nenhum prompt de classificação de leads encontrado."
+                                            />
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         )}
                     </div>

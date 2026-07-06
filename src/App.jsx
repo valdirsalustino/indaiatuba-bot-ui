@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { jwtDecode } from 'jwt-decode';
+import { Routes, Route } from 'react-router-dom';
 import Login from './components/Login.jsx';
 import ConversationList from './components/ConversationList.jsx';
 import ChatWindow from './components/ChatWindow.jsx';
@@ -9,6 +10,11 @@ import ConfirmationModal from './components/ConfirmationModal.jsx';
 import UserManagement from './components/UserManagement.jsx';
 import ClientConfigurations from './components/ClientConfigurations.jsx';
 import Dashboard from './components/Dashboard.jsx';
+import CalendarIntegration from './components/CalendarIntegration.jsx';
+import OAuthCallback from './components/OAuthCallback.jsx';
+import AdminCalendarView from './components/AdminCalendarView.jsx';
+import TopNavbar from './components/TopNavbar.jsx';
+import { useToast } from './context/ToastContext.jsx';
 
 // Logic to determine WebSocket protocol
 const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -31,6 +37,13 @@ const getUserFromToken = (token) => {
 
 const getTenantFromUrl = () => {
     const hostname = window.location.hostname;
+    
+    // For local development with Google OAuth, subdomains in redirect URIs are not allowed.
+    // Allow an override via Vite env var, or fallback to a default if accessed via pure localhost.
+    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+        return import.meta.env.VITE_DEFAULT_TENANT || 'indaiatubadayhospital';
+    }
+
     const parts = hostname.split('.');
 
     const isLocalhost = hostname.includes('localhost');
@@ -50,6 +63,7 @@ const getTenantFromUrl = () => {
 };
 
 function App() {
+  const { addToast } = useToast();
   const [tenant, setTenant] = useState(getTenantFromUrl());
 
   // Dynamic base URLs that include the tenant name
@@ -64,10 +78,22 @@ function App() {
   const [conversations, setConversations] = useState([]);
   const [selectedConversation, setSelectedConversation] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+  const isLoadingRef = useRef(false);
   const [error, setError] = useState(null);
   const [activeView, setActiveView] = useState('conversations');
+  const [activeTab, setActiveTab] = useState('Novos');
   const [departments, setDepartments] = useState([]);
   const [clientName, setClientName] = useState('');
+  const [features, setFeatures] = useState({ enable_google_calendar_scheduling: false });
+  const [showTopics, setShowTopics] = useState(false);
+  const [showLeads, setShowLeads] = useState(false);
+  const [filterTopic, setFilterTopic] = useState('');
+  const [filterLead, setFilterLead] = useState('');
+  const [classificationLabels, setClassificationLabels] = useState({ topics: [], leads: [] });
+
+  const filterTopicRef = useRef('');
+  const filterLeadRef = useRef('');
+
 
   // Pagination States
   const [skip, setSkip] = useState(0);
@@ -111,13 +137,25 @@ function App() {
   }, [handleLogout]);
 
   // Updated fetchConversations to handle pagination
-  const fetchConversations = useCallback(async (currentSkip = 0, isLoadMore = false) => {
+  const fetchConversations = useCallback(async (currentSkip = 0, isLoadMore = false, topicParam = undefined, leadParam = undefined) => {
     if (!token) return;
     setIsLoading(true);
+    isLoadingRef.current = true;
     setError(null);
     try {
+      const activeTopic = topicParam !== undefined ? topicParam : filterTopicRef.current;
+      const activeLead = leadParam !== undefined ? leadParam : filterLeadRef.current;
+
+      let url = `${apiBaseUrl}/conversations?limit=${LIMIT}&skip=${currentSkip}`;
+      if (activeTopic) {
+        url += `&topic=${encodeURIComponent(activeTopic)}`;
+      }
+      if (activeLead) {
+        url += `&lead=${encodeURIComponent(activeLead)}`;
+      }
+
       // Using the dynamic apiBaseUrl
-      const response = await authFetch(`${apiBaseUrl}/conversations?limit=${LIMIT}&skip=${currentSkip}`);
+      const response = await authFetch(url);
       if (!response.ok) throw new Error('Failed to fetch conversations.');
 
       const serverData = await response.json();
@@ -182,6 +220,7 @@ function App() {
       }
     } finally {
       setIsLoading(false);
+      isLoadingRef.current = false;
     }
   }, [token, authFetch, apiBaseUrl]);
 
@@ -211,9 +250,48 @@ function App() {
     }
   }, [token, apiBaseUrl, authFetch]);
 
+  const fetchFeatures = useCallback(async () => {
+    if (!token) return;
+    try {
+        const response = await authFetch(`${apiBaseUrl}/features`);
+        if (response.ok) {
+            const data = await response.json();
+            setFeatures(data);
+        }
+    } catch (error) {
+        console.error("Failed to fetch features:", error);
+    }
+  }, [token, apiBaseUrl, authFetch]);
+
+  const fetchClassificationLabels = useCallback(async () => {
+    if (!token) return;
+    try {
+        const response = await authFetch(`${apiBaseUrl}/classifications/labels`);
+        if (response.ok) {
+            const data = await response.json();
+            setClassificationLabels(data);
+        }
+    } catch (error) {
+        console.error("Failed to fetch classification labels:", error);
+    }
+  }, [token, apiBaseUrl, authFetch]);
+
+  const handleFilterChange = (newTopic, newLead) => {
+    setFilterTopic(newTopic);
+    setFilterLead(newLead);
+    filterTopicRef.current = newTopic;
+    filterLeadRef.current = newLead;
+    setSkip(0);
+    setHasMore(true);
+    setConversations([]);
+    fetchConversations(0, false, newTopic, newLead);
+  };
+
+
   // Expose a loadMore function to pass to the ConversationList
   const loadMoreConversations = () => {
-    if (!isLoading && hasMore) {
+    if (!isLoadingRef.current && hasMore) {
+        isLoadingRef.current = true;
         const nextSkip = skip + LIMIT;
         setSkip(nextSkip);
         fetchConversations(nextSkip, true);
@@ -293,7 +371,21 @@ function App() {
             );
 
             if (!isKnownConversation) {
-              fetchConversations(0, false); // Refresh from top if a brand new thread comes in
+              // Instead of resetting the whole list (which breaks pagination),
+              // fetch just the new conversation and prepend it.
+              authFetch(`${apiBaseUrl}/conversations/${data.composite_id}`)
+                .then(res => {
+                   if (res.ok) return res.json();
+                   throw new Error('Failed to fetch new conversation');
+                })
+                .then(newConv => {
+                   setConversations(prev => {
+                       // Double check it wasn't added while we were fetching
+                       if (prev.some(c => c.composite_id === newConv.composite_id)) return prev;
+                       return [newConv, ...prev];
+                   });
+                })
+                .catch(err => console.error("Error fetching new conversation:", err));
               return;
             }
 
@@ -333,7 +425,10 @@ function App() {
                   sender: data.data.sender,
                   timestamp: data.data.timestamp,
                   media_url: data.data.media_url,
-                  content_type: contentType
+                  content_type: contentType,
+                  message_id: data.data.message_id,
+                  is_edited: data.data.is_edited,
+                  edited_at: data.data.edited_at
               };
 
               const updatedConv = {
@@ -354,6 +449,26 @@ function App() {
               return [updatedConv, ...otherConvs];
             });
           }
+          // Handle in-place message edits (from both admin PATCH and client WhatsApp edits)
+          else if (data.update === 'message_edited' && data.data) {
+            setConversations(prevConversations => {
+              return prevConversations.map(conv => {
+                if (conv.composite_id !== data.composite_id) return conv;
+                return {
+                  ...conv,
+                  messages: conv.messages.map(msg => {
+                    if (msg.message_id !== data.data.message_id) return msg;
+                    return {
+                      ...msg,
+                      text: data.data.new_text,
+                      is_edited: true,
+                      edited_at: data.data.edited_at,
+                    };
+                  }),
+                };
+              });
+            });
+          }
           // ADDED 'conversation_closed' and 'status_changed' to catch bot closing events
           else if (['new_handoff_request', 'conversation_resolved', 'supervision_type_changed', 'conversation_taken_over', 'conversation_closed', 'status_changed'].includes(data.update)) {
 
@@ -366,6 +481,36 @@ function App() {
               } catch (err) {
                 console.error("Erro ao tentar tocar o áudio:", err);
               }
+              
+              // Trigger Toast Notification
+              addToast("Um cliente solicitou atendimento humano", "alert", {
+                  label: "Acessar",
+                  onClick: async () => {
+                      setActiveView('conversations');
+                      setActiveTab('Novos');
+                      if (data.composite_id) {
+                          const targetConv = conversationsRef.current.find(c => c.composite_id === data.composite_id);
+                          if (targetConv) {
+                              handleSelectConversation(targetConv);
+                          } else {
+                              // If not in local state, fetch it securely before selecting
+                              try {
+                                  const res = await authFetch(`${apiBaseUrl}/conversations/${data.composite_id}`);
+                                  if (res.ok) {
+                                      const newConv = await res.json();
+                                      setConversations(prev => {
+                                          if (prev.some(c => c.composite_id === newConv.composite_id)) return prev;
+                                          return [newConv, ...prev];
+                                      });
+                                      handleSelectConversation(newConv);
+                                  }
+                              } catch (err) {
+                                  console.error("Failed to fetch handoff conversation", err);
+                              }
+                          }
+                      }
+                  }
+              });
             }
             fetchConversations(0, false);
           }
@@ -389,7 +534,7 @@ function App() {
 
     return () => {
         clearTimeout(reconnectTimeout);
-        if (ws && ws.readyState === 1) {
+        if (ws) {
             ws.close();
         }
     };
@@ -408,8 +553,11 @@ function App() {
     if (token && (activeView === 'conversations' || activeView === 'userManagement')) {
         fetchDepartments();
         fetchClientInfo();
+        fetchFeatures();
+        fetchClassificationLabels();
     }
-  }, [token, activeView, fetchDepartments, fetchClientInfo]);
+  }, [token, activeView, fetchDepartments, fetchClientInfo, fetchFeatures, fetchClassificationLabels]);
+
 
   const handleLogin = (newToken) => {
     localStorage.setItem('admin_token', newToken);
@@ -443,6 +591,28 @@ function App() {
     } catch (err) {
         if (err.message !== 'Authentication failed') {
             setError("Failed to send message.");
+        }
+    }
+  };
+
+  const handleEditMessage = async (compositeId, messageId, newText) => {
+    try {
+        const response = await authFetch(
+            `${apiBaseUrl}/conversations/${compositeId}/messages/${encodeURIComponent(messageId)}`,
+            {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ new_text: newText }),
+            }
+        );
+        if (!response.ok) {
+            const err = await response.json();
+            setError(err.detail || 'Failed to edit message.');
+        }
+        // WebSocket will broadcast the update; no need to refetch
+    } catch (err) {
+        if (err.message !== 'Authentication failed') {
+            setError('Failed to edit message.');
         }
     }
   };
@@ -548,6 +718,9 @@ function App() {
     return allConvsForPhone.length > 0 && allConvsForPhone[0].composite_id === selectedConversation.composite_id;
   }, [conversations, selectedConversation]);
 
+  const isCalendarEnabled = features?.enable_google_calendar_scheduling || false;
+
+
   if (isValidTenant === null) {
       return <div className="flex items-center justify-center h-screen bg-gray-200">Validando cliente...</div>;
   }
@@ -564,84 +737,135 @@ function App() {
   }
 
   if (!token || !currentUser) {
-    return <Login onLogin={handleLogin} apiBaseUrl={apiBaseUrl} />;
+    return (
+      <Routes>
+        <Route path="/calendar/callback" element={<OAuthCallback apiBaseUrl={apiBaseUrl} token={null} />} />
+        <Route path="*" element={<Login onLogin={handleLogin} apiBaseUrl={apiBaseUrl} />} />
+      </Routes>
+    );
   }
 
   return (
-    <div className="h-screen w-screen bg-gray-200 flex font-sans antialiased text-gray-800">
-      <ConfirmationModal
-        isOpen={modalState.isOpen}
-        onClose={() => setModalState({ ...modalState, isOpen: false })}
-        onConfirm={() => {
-          if (modalState.onConfirm) {
-            modalState.onConfirm();
-          }
-          setModalState({ ...modalState, isOpen: false });
-        }}
-        message={modalState.message}
-        isAlert={modalState.isAlert}
-      />
-      <div className="w-full h-full flex shadow-lg">
-        {activeView !== 'dashboard' && (
-          <ConversationList
-            conversations={conversations}
-            onSelect={handleSelectConversation}
-            selectedId={selectedConversation?.composite_id}
+    <Routes>
+      <Route path="/calendar/callback" element={<OAuthCallback apiBaseUrl={apiBaseUrl} token={token} />} />
+      <Route path="*" element={
+        <div className="h-screen w-screen bg-gray-50 flex flex-col font-sans antialiased text-gray-800 overflow-hidden">
+          <ConfirmationModal
+            isOpen={modalState.isOpen}
+            onClose={() => setModalState({ ...modalState, isOpen: false })}
+            onConfirm={() => {
+              if (modalState.onConfirm) {
+                modalState.onConfirm();
+              }
+              setModalState({ ...modalState, isOpen: false });
+            }}
+            message={modalState.message}
+            isAlert={modalState.isAlert}
+          />
+          
+          <TopNavbar
             onLogout={handleLogout}
-            anyNeedsAttention={anyNeedsAttention}
             isAdmin={currentUser.role === 'Admin'}
+            isDoctor={currentUser.role === 'Médico'}
+            isCalendarEnabled={isCalendarEnabled}
             onShowUserManagement={() => setActiveView('userManagement')}
             onShowClientConfigs={() => setActiveView('clientConfigurations')}
             onShowDashboard={() => setActiveView('dashboard')}
             onShowConversations={() => setActiveView('conversations')}
+            onShowCalendar={() => setActiveView('calendar')}
+            onShowAdminCalendar={() => setActiveView('adminCalendar')}
             currentUser={currentUser}
-            onLoadMore={loadMoreConversations}
+            clientName={clientName}
+            activeView={activeView}
           />
-        )}
 
-        {activeView === 'conversations' && (
-            <ChatWindow
-                conversation={selectedConversation}
-                onSendMessage={handleSendMessage}
-                onMarkAsSolved={handleMarkAsSolved}
-                onInitiateTransfer={handleUpdateSupervisionType}
-                onTakeOver={handleTakeOverConversation}
-                onReopenThread={handleReopenThread}
+          <div className="w-full flex-grow flex overflow-hidden">
+            {activeView !== 'dashboard' && (
+              <ConversationList
+                activeTab={activeTab}
+                setActiveTab={setActiveTab}
+                conversations={conversations}
+                onSelect={handleSelectConversation}
+                selectedId={selectedConversation?.composite_id}
+                anyNeedsAttention={anyNeedsAttention}
                 currentUser={currentUser}
-                departments={departments}
-                isLatestThread={isLatestThread}
-                clientName={clientName}
-            />
-        )}
+                onLoadMore={loadMoreConversations}
+                showTopics={showTopics}
+                setShowTopics={setShowTopics}
+                showLeads={showLeads}
+                setShowLeads={setShowLeads}
+                enableLeadClassification={features?.enable_lead_classification || false}
+                classificationLabels={classificationLabels}
+                filterTopic={filterTopic}
+                filterLead={filterLead}
+                onFilterChange={handleFilterChange}
+              />
+            )}
 
-        {activeView === 'userManagement' && currentUser.role === 'Admin' && (
-            <UserManagement
-                token={token}
-                apiBaseUrl={apiBaseUrl}
-                onAction={(message, onConfirm) => setModalState({ isOpen: true, message, onConfirm })}
-                currentUser={currentUser}
-                departments={departments}
-            />
-        )}
+            {activeView === 'conversations' && (
+                <ChatWindow
+                    conversation={selectedConversation}
+                    onSendMessage={handleSendMessage}
+                    onEditMessage={handleEditMessage}
+                    onMarkAsSolved={handleMarkAsSolved}
+                    onInitiateTransfer={handleUpdateSupervisionType}
+                    onTakeOver={handleTakeOverConversation}
+                    onReopenThread={handleReopenThread}
+                    currentUser={currentUser}
+                    departments={departments}
+                    isLatestThread={isLatestThread}
+                    clientName={clientName}
+                    showTopics={showTopics}
+                    showLeads={showLeads}
+                />
+            )}
 
-        {activeView === 'clientConfigurations' && currentUser.role === 'Admin' && (
-            <ClientConfigurations
-                token={token}
-                apiBaseUrl={apiBaseUrl}
-                onClose={() => setActiveView('conversations')}
-                onAction={(message, onConfirm) => setModalState({ isOpen: true, message, onConfirm })}
-            />
-        )}
+            {activeView === 'userManagement' && currentUser.role === 'Admin' && (
+                <UserManagement
+                    token={token}
+                    apiBaseUrl={apiBaseUrl}
+                    onAction={(message, onConfirm) => setModalState({ isOpen: true, message, onConfirm })}
+                    currentUser={currentUser}
+                    departments={departments}
+                />
+            )}
 
-        {activeView === 'dashboard' && currentUser.role === 'Admin' && (
-            <Dashboard 
-                onClose={() => setActiveView('conversations')} 
-                apiBaseUrl={apiBaseUrl} 
-                token={token} 
-            />
-        )}
-      </div>
-    </div>
+            {activeView === 'clientConfigurations' && currentUser.role === 'Admin' && (
+                <ClientConfigurations
+                    token={token}
+                    apiBaseUrl={apiBaseUrl}
+                    onClose={() => setActiveView('conversations')}
+                    onAction={(message, onConfirm) => setModalState({ isOpen: true, message, onConfirm })}
+                />
+            )}
+
+            {activeView === 'dashboard' && currentUser.role === 'Admin' && (
+                <Dashboard 
+                    onClose={() => setActiveView('conversations')} 
+                    apiBaseUrl={apiBaseUrl} 
+                    token={token} 
+                />
+            )}
+
+            {activeView === 'calendar' && isCalendarEnabled && (
+                <CalendarIntegration
+                    currentUser={currentUser}
+                    apiBaseUrl={apiBaseUrl}
+                    token={token}
+                />
+            )}
+
+            {activeView === 'adminCalendar' && ['Admin', 'Secretaria', 'Médico'].includes(currentUser.role) && isCalendarEnabled && (
+                <AdminCalendarView
+                    currentUser={currentUser}
+                    apiBaseUrl={apiBaseUrl}
+                    token={token}
+                />
+            )}
+          </div>
+        </div>
+      } />
+    </Routes>
   );
 }
 
