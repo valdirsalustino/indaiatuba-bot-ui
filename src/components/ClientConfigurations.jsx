@@ -19,6 +19,8 @@ export default function ClientConfigurations({ apiBaseUrl, token, onAction }) {
     const [originalWelcomeMessage, setOriginalWelcomeMessage] = useState('');
     const [queueWaitingMessage, setQueueWaitingMessage] = useState('');
     const [originalQueueWaitingMessage, setOriginalQueueWaitingMessage] = useState('');
+    const [timeoutMessage, setTimeoutMessage] = useState('');
+    const [originalTimeoutMessage, setOriginalTimeoutMessage] = useState('');
     const [staleTimeout, setStaleTimeout] = useState(10);
     const [originalStaleTimeout, setOriginalStaleTimeout] = useState(10);
 
@@ -100,13 +102,14 @@ export default function ClientConfigurations({ apiBaseUrl, token, onAction }) {
                     };
                     
                     const [
-                        infoRes, promptRes, welcomeRes, queueRes, 
+                        infoRes, promptRes, welcomeRes, queueRes, timeoutRes, 
                         staleTimeoutRes, featuresRes, leadPromptRes, topicsRes
                     ] = await Promise.all([
                         fetch(`${apiBaseUrl}/client-info`, { method: 'GET', headers }),
                         fetch(`${apiBaseUrl}/system-prompt`, { method: 'GET', headers }),
                         fetch(`${apiBaseUrl}/welcome-message`, { method: 'GET', headers }),
                         fetch(`${apiBaseUrl}/queue-waiting-message`, { method: 'GET', headers }),
+                        fetch(`${apiBaseUrl}/timeout-message`, { method: 'GET', headers }),
                         fetch(`${apiBaseUrl}/stale-timeout`, { method: 'GET', headers }),
                         fetch(`${apiBaseUrl}/features`, { method: 'GET', headers }),
                         fetch(`${apiBaseUrl}/lead-classification-prompt`, { method: 'GET', headers }),
@@ -157,6 +160,17 @@ export default function ClientConfigurations({ apiBaseUrl, token, onAction }) {
                         throw new Error(errorData.detail || `Erro ao carregar mensagem da fila de espera: Status ${queueRes.status}`);
                     } else {
                         setQueueWaitingMessage('');
+                    }
+
+                    if (timeoutRes.ok) {
+                        const timeoutMsgData = await timeoutRes.json();
+                        setTimeoutMessage(timeoutMsgData.message || '');
+                        setOriginalTimeoutMessage(timeoutMsgData.message || '');
+                    } else if (timeoutRes.status !== 404) {
+                        const errorData = await timeoutRes.json().catch(() => ({}));
+                        throw new Error(errorData.detail || `Erro ao carregar mensagem de inatividade: Status ${timeoutRes.status}`);
+                    } else {
+                        setTimeoutMessage('');
                     }
 
                     if (staleTimeoutRes.ok) {
@@ -434,6 +448,21 @@ export default function ClientConfigurations({ apiBaseUrl, token, onAction }) {
                     throw new Error(errorData.detail || `Erro ao salvar mensagem da fila de espera: Status ${queueResponse.status}`);
                 }
                 setOriginalQueueWaitingMessage(queueWaitingMessage);
+            }
+
+            if (timeoutMessage !== originalTimeoutMessage) {
+                const timeoutUrl = `${apiBaseUrl}/timeout-message`;
+                const timeoutResponse = await fetch(timeoutUrl, {
+                    method: 'PUT',
+                    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: timeoutMessage })
+                });
+
+                if (!timeoutResponse.ok) {
+                    const errorData = await timeoutResponse.json().catch(() => ({}));
+                    throw new Error(errorData.detail || `Erro ao salvar mensagem de inatividade: Status ${timeoutResponse.status}`);
+                }
+                setOriginalTimeoutMessage(timeoutMessage);
             }
 
             if (staleTimeout !== originalStaleTimeout) {
@@ -1030,6 +1059,17 @@ export default function ClientConfigurations({ apiBaseUrl, token, onAction }) {
                                         readOnly={!isEditingClientPrompt}
                                         className={`w-full h-32 p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 resize-y overflow-auto ${!isEditingClientPrompt ? 'bg-gray-100' : ''}`}
                                         placeholder="Nenhuma mensagem da fila de espera."
+                                    />
+                                </div>
+
+                                <div>
+                                    <h4 className="text-lg font-semibold text-gray-700 mb-2">Mensagem de Encerramento por Inatividade</h4>
+                                    <textarea
+                                        value={timeoutMessage}
+                                        onChange={(e) => setTimeoutMessage(e.target.value)}
+                                        readOnly={!isEditingClientPrompt}
+                                        className={`w-full h-32 p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 resize-y overflow-auto ${!isEditingClientPrompt ? 'bg-gray-100' : ''}`}
+                                        placeholder="Nenhuma mensagem de encerramento por inatividade."
                                     />
                                 </div>
 
