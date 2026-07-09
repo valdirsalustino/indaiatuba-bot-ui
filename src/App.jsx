@@ -628,11 +628,13 @@ function App() {
         const errorData = await response.json();
         throw new Error(errorData.detail || 'An error occurred.');
       }
+      return true;
       // No need to refetch here, websocket will handle it
     } catch (err) {
         if (err.message !== 'Authentication failed') {
             setError(err.message);
         }
+        return false;
     }
   };
 
@@ -674,41 +676,18 @@ function App() {
   };
 
   const handleReopenThread = (compositeId) => {
-    const conversation = conversations.find(c => c.composite_id === compositeId);
-    
-    if (conversation) {
-        const userMessages = (conversation.messages || []).filter(m => m.sender === 'user');
-        let lastMessageDate = null;
-
-        if (userMessages.length > 0) {
-            lastMessageDate = new Date(userMessages[userMessages.length - 1].timestamp);
-        } else if (conversation.last_updated) {
-            lastMessageDate = new Date(conversation.last_updated);
-        }
-
-        if (lastMessageDate) {
-            const now = new Date();
-            const diffHours = (now - lastMessageDate) / (1000 * 60 * 60);
-
-            if (diffHours > 24) {
-                setModalState({
-                  isOpen: true,
-                  isAlert: true,
-                  message: 'Já se passaram 24h desde a última conversa recebida pelo cliente. Não é possível reabrir essa conversa.',
-                  onConfirm: null
-                });
-                return;
-            }
-        }
-    }
-
     setModalState({
       isOpen: true,
       message: 'Tem certeza que deseja reabrir esta conversa para enviar uma mensagem ao cliente?',
-      onConfirm: () => handleApiCall(
-        `${apiBaseUrl}/conversations/${compositeId}/reopen`,
-        { method: 'POST' }
-      ),
+      onConfirm: async () => {
+        const success = await handleApiCall(
+          `${apiBaseUrl}/conversations/${compositeId}/reopen`,
+          { method: 'POST' }
+        );
+        if (success) {
+            setActiveTab('Novos');
+        }
+      },
     });
   };
 

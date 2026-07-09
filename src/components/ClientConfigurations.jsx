@@ -23,6 +23,8 @@ export default function ClientConfigurations({ apiBaseUrl, token, onAction }) {
     const [originalTimeoutMessage, setOriginalTimeoutMessage] = useState('');
     const [staleTimeout, setStaleTimeout] = useState(10);
     const [originalStaleTimeout, setOriginalStaleTimeout] = useState(10);
+    const [whatsappTemplate, setWhatsappTemplate] = useState('');
+    const [originalWhatsappTemplate, setOriginalWhatsappTemplate] = useState('');
 
     const [enableGoogleCalendarScheduling, setEnableGoogleCalendarScheduling] = useState(false);
     const [originalEnableGoogleCalendarScheduling, setOriginalEnableGoogleCalendarScheduling] = useState(false);
@@ -113,7 +115,8 @@ export default function ClientConfigurations({ apiBaseUrl, token, onAction }) {
                         fetch(`${apiBaseUrl}/stale-timeout`, { method: 'GET', headers }),
                         fetch(`${apiBaseUrl}/features`, { method: 'GET', headers }),
                         fetch(`${apiBaseUrl}/lead-classification-prompt`, { method: 'GET', headers }),
-                        fetch(`${apiBaseUrl}/topic-classification`, { method: 'GET', headers })
+                        fetch(`${apiBaseUrl}/topic-classification`, { method: 'GET', headers }),
+                        fetch(`${apiBaseUrl}/whatsapp-template`, { method: 'GET', headers })
                     ]);
 
                     if (infoRes.ok) {
@@ -182,6 +185,27 @@ export default function ClientConfigurations({ apiBaseUrl, token, onAction }) {
                         throw new Error(errorData.detail || `Erro ao carregar período de espera: Status ${staleTimeoutRes.status}`);
                     } else {
                         setStaleTimeout(10);
+                    }
+
+                    // --- [ADDED] Whatsapp Template ---
+                    const templateRes = arguments[0]?.length ? arguments[0][9] : null; 
+                    // Wait, using Promise.all returns an array which is destructured on line 104
+                    // I will just fetch it directly below to not break the destructured variables array size
+                    
+                    try {
+                        const wRes = await fetch(`${apiBaseUrl}/whatsapp-template`, { method: 'GET', headers });
+                        if (wRes.ok) {
+                            const wData = await wRes.json();
+                            setWhatsappTemplate(wData.template || '');
+                            setOriginalWhatsappTemplate(wData.template || '');
+                        } else if (wRes.status !== 404) {
+                            const errorData = await wRes.json().catch(() => ({}));
+                            throw new Error(errorData.detail || `Erro ao carregar template do whatsapp: Status ${wRes.status}`);
+                        } else {
+                            setWhatsappTemplate('');
+                        }
+                    } catch (err) {
+                        console.error(err);
                     }
 
                     if (featuresRes.ok) {
@@ -479,6 +503,23 @@ export default function ClientConfigurations({ apiBaseUrl, token, onAction }) {
                 }
                 setOriginalStaleTimeout(staleTimeout);
             }
+
+            if (whatsappTemplate !== originalWhatsappTemplate) {
+                const wUrl = `${apiBaseUrl}/whatsapp-template`;
+                const wResponse = await fetch(wUrl, {
+                    method: 'PUT',
+                    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ template: whatsappTemplate })
+                });
+
+                if (!wResponse.ok) {
+                    const errorData = await wResponse.json().catch(() => ({}));
+                    throw new Error(errorData.detail || `Erro ao salvar template do whatsapp: Status ${wResponse.status}`);
+                }
+                setOriginalWhatsappTemplate(whatsappTemplate);
+            }
+
+            // Lead Classification and Topics logic...
 
             setIsEditingClientPrompt(false);
         } catch (error) {
@@ -1091,6 +1132,20 @@ export default function ClientConfigurations({ apiBaseUrl, token, onAction }) {
                                         className={`w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 ${!isEditingClientPrompt ? 'bg-gray-100' : 'bg-white'}`}
                                         placeholder="Minutos de inatividade"
                                     />
+                                </div>
+                                
+                                <div>
+                                    <h4 className="text-lg font-semibold text-gray-700 mb-2 mt-4">Mensagem de Template do WhatsApp (Fallback 24h)</h4>
+                                    <textarea
+                                        value={whatsappTemplate}
+                                        onChange={(e) => setWhatsappTemplate(e.target.value)}
+                                        readOnly={!isEditingClientPrompt}
+                                        className={`w-full h-32 p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 resize-y overflow-auto ${!isEditingClientPrompt ? 'bg-gray-100' : ''}`}
+                                        placeholder="Ex: Temos uma mensagem do suporte: {{admin_msg}}\n\nResponda para reativar o chat."
+                                    />
+                                    <p className="text-sm text-gray-500 mt-1">
+                                        Use a variável <strong>{`{{admin_msg}}`}</strong> para indicar onde o texto do atendente deve ser injetado.
+                                    </p>
                                 </div>
                                 
                                 <div>
