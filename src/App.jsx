@@ -127,10 +127,14 @@ function App() {
 
       const response = await fetch(url, { ...options, headers });
 
-      if (response.status === 401 || response.status === 403) {
+      if (response.status === 401) {
           // Token is invalid or expired
           handleLogout();
           throw new Error('Authentication failed');
+      }
+      
+      if (response.status === 403) {
+          throw new Error('Forbidden: You do not have permission.');
       }
 
       return response;
