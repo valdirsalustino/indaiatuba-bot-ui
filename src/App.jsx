@@ -586,15 +586,21 @@ function App() {
     const formData = new FormData();
     if (messageData.file) formData.append('file', messageData.file);
     if (messageData.text) formData.append('text', messageData.text);
+    if (messageData.isTemplate) formData.append('is_template_fallback', 'true');
 
     try {
-        await authFetch(`${apiBaseUrl}/conversations/${selectedConversation.composite_id}/send`, {
+        const response = await authFetch(`${apiBaseUrl}/conversations/${selectedConversation.composite_id}/send`, {
             method: 'POST',
             body: formData,
         });
+        
+        if (!response.ok) {
+            const err = await response.json();
+            throw new Error(err.detail || 'Failed to send message.');
+        }
     } catch (err) {
         if (err.message !== 'Authentication failed') {
-            setError("Failed to send message.");
+            setError(err.message || "Failed to send message.");
         }
     }
   };

@@ -2,16 +2,12 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import Avatar from './Avatar.jsx';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import ReactQuill from 'react-quill-new';
-import 'react-quill-new/dist/quill.snow.css';
-import TurndownService from 'turndown';
-import { gfm } from 'turndown-plugin-gfm';
+import ChatInputArea from './ChatInputArea.jsx';
+import { isWhatsAppWindowClosed } from '../utils/whatsapp.js';
 
 // --- ICONS ---
-const SendIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="transform -rotate-45 ml-1 mb-1"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg> );
 const SolvedIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1.5"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg> );
 const TakeOverIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1.5"><path d="M3 18v-6a9 9 0 0 1 18 0v6"></path><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"></path></svg> );
-const PaperclipIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg> );
 const DownloadIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5 mr-2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg> );
 const PhoneIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6 text-gray-500 hover:text-green-500" title="Reabrir conversa"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg> );
 const PencilIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg> );
@@ -33,13 +29,9 @@ const MediaRenderer = ({ msg }) => {
 };
 
 export default function ChatWindow({ conversation, onSendMessage, onEditMessage, onMarkAsSolved, onInitiateTransfer, onTakeOver, onReopenThread, currentUser, departments = [], isLatestThread = false, clientName = '', showTopics = false, showLeads = false }) {
-  const [editorHtml, setEditorHtml] = useState('');
-  const [attachedFile, setAttachedFile] = useState(null);
   const [editingMessageId, setEditingMessageId] = useState(null); // wamid being edited
   const [editText, setEditText] = useState('');               // current text in the edit textarea
   const messagesEndRef = useRef(null);
-  const fileInputRef = useRef(null);
-  const quillRef = useRef(null);
 
   const handleConfirmEdit = (compositeId, messageId) => {
     if (editText.trim() && editText.trim() !== '') {
@@ -54,118 +46,13 @@ export default function ChatWindow({ conversation, onSendMessage, onEditMessage,
     setEditText('');
   };
 
-  // --- TURNDOWN SERVICE SETUP ---
-  const turndownService = useMemo(() => {
-    const service = new TurndownService({
-        headingStyle: 'atx',
-        codeBlockStyle: 'fenced',
-        bulletListMarker: '-', // REVERTED: Use standard '-' for stability inside the engine
-        strongDelimiter: '**'
-    });
-
-    service.use(gfm);
-
-    service.addRule('styledBold', {
-        filter: function (node) {
-            return (
-                node.nodeName === 'SPAN' &&
-                (node.style.fontWeight === 'bold' || parseInt(node.style.fontWeight) >= 700)
-            );
-        },
-        replacement: function (content) {
-            return '**' + content + '**';
-        }
-    });
-
-    service.addRule('styledItalic', {
-        filter: function (node) {
-            return (
-                node.nodeName === 'SPAN' &&
-                (node.style.fontStyle === 'italic')
-            );
-        },
-        replacement: function (content) {
-            return '_' + content + '_';
-        }
-    });
-
-    service.addRule('styledStrike', {
-        filter: function (node) {
-            return (
-                node.nodeName === 'SPAN' &&
-                (node.style.textDecoration.includes('line-through'))
-            );
-        },
-        replacement: function (content) {
-            return '~~' + content + '~~';
-        }
-    });
-
-    return service;
-  }, []);
-
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [conversation]);
 
-  useEffect(() => {
-      setEditorHtml('');
-      setAttachedFile(null);
-  }, [conversation?.composite_id]);
-
-  const handleSend = () => {
-    const tempDiv = document.createElement('div');
-    tempDiv.innerHTML = editorHtml;
-    const textContent = tempDiv.textContent || tempDiv.innerText || '';
-
-    if (textContent.trim() || attachedFile) {
-        let textToSend = '';
-
-        if (textContent.trim()) {
-            // 1. Convert HTML to Markdown (Standard)
-            let markdown = turndownService.turndown(editorHtml);
-
-            // 2. Fix Non-Breaking Spaces (Wrapping Issue)
-            markdown = markdown.replace(/\u00A0/g, ' ');
-
-            // 3. WHATSAPP FIX: Convert standard list hyphens (-) to Visual Bullets (•)
-            // This Regex finds a hyphen at the start of a line (with optional indentation) and swaps it.
-            markdown = markdown.replace(/^(\s*)-\s+/gm, '$1• ');
-
-            const nameToDisplay = currentUser.name || currentUser.username || 'Assistente';
-            textToSend = `**${nameToDisplay}:**\n\n${markdown}`;
-        }
-
-        onSendMessage({ text: textToSend, file: attachedFile });
-        setEditorHtml('');
-        setAttachedFile(null);
-    }
-  };
-
-  const modules = useMemo(() => ({
-    toolbar: [
-      ['bold', 'italic', 'strike'],
-      [{ 'list': 'ordered'}, { 'list': 'bullet' }]
-    ],
-    keyboard: {
-        bindings: {
-            enter: {
-                key: 13,
-                shiftKey: false,
-                handler: () => { return true; }
-            }
-        }
-    }
-  }), []);
-
-  const handleKeyDown = (e) => {
-      if (e.key === 'Enter' && !e.shiftKey) {
-          e.preventDefault();
-          handleSend();
-      }
-  };
-
-  const handleFileChange = (e) => { if (e.target.files && e.target.files[0]) { setAttachedFile(e.target.files[0]); } };
   const handleTypeChange = (e) => { const newType = e.target.value; if (newType) { onInitiateTransfer(conversation.composite_id, newType); e.target.value = ""; } };
 
+
+  // --- 24h Window Detection ---
+  const isPast24hWindow = useMemo(() => isWhatsAppWindowClosed(conversation?.messages), [conversation?.messages]);
 
   if (!conversation) {
     return (
@@ -183,6 +70,7 @@ export default function ChatWindow({ conversation, onSendMessage, onEditMessage,
   const safeDepartments = departments.map(dep => typeof dep === 'object' ? dep.name : dep);
   const availableTypes = safeDepartments.filter( (type) => type !== conversation.human_supervision_type );
   const isInputDisabled = conversation.status !== 'open' || !conversation.human_supervision;
+
 
   return (
     <div className="flex-grow flex flex-col bg-[#f8fafc]">
@@ -438,64 +326,13 @@ export default function ChatWindow({ conversation, onSendMessage, onEditMessage,
         </div>
       </div>
 
-      {/* Footer code remains identical to previous versions... */}
-      <footer className="bg-gray-50 p-4 border-t border-gray-200">
-        {attachedFile && (
-            <div className="px-4 pb-2 text-sm text-gray-600 flex justify-between items-center">
-                <span>Anexado: {attachedFile.name}</span>
-                <button onClick={() => setAttachedFile(null)} className="font-bold text-red-500">X</button>
-            </div>
-        )}
-
-        <div className="flex flex-col bg-white rounded-2xl shadow-sm border border-gray-200 focus-within:ring-2 focus-within:ring-indigo-100 focus-within:border-indigo-300 transition-all max-w-5xl mx-auto w-full">
-          <div className="flex items-end p-2 relative">
-             <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" />
-             <button onClick={() => fileInputRef.current.click()} className="p-2.5 text-gray-400 hover:text-indigo-500 hover:bg-gray-50 rounded-full transition-colors self-end mb-1" disabled={isInputDisabled} title="Anexar arquivo"><PaperclipIcon /></button>
-
-             {/* EDITOR CONTAINER */}
-             <div className="flex-grow mx-2" style={{ maxWidth: 'calc(100% - 100px)' }} onKeyDown={handleKeyDown}>
-                {!isInputDisabled ? (
-                    <ReactQuill
-                        ref={quillRef}
-                        theme="snow"
-                        value={editorHtml}
-                        onChange={setEditorHtml}
-                        modules={modules}
-                        placeholder={attachedFile ? "Adicione uma legenda (opcional)" : "Digite uma mensagem"}
-                        className="custom-quill-editor"
-                    />
-                ) : (
-                    <div className="p-3 text-gray-400 italic bg-gray-50 rounded">
-                        {conversation.status !== 'open' ? "Conversa encerrada" : "Assuma a conversa para enviar mensagens"}
-                    </div>
-                )}
-             </div>
-                 <button onClick={handleSend} className="p-3 mx-1 text-white bg-indigo-600 hover:bg-indigo-700 rounded-full transition-colors duration-200 disabled:bg-gray-300 shadow-sm self-end mb-1 flex items-center justify-center" disabled={isInputDisabled}><SendIcon /></button>
-          </div>
-
-          <style>{`
-            .custom-quill-editor .ql-container {
-                border: none !important;
-                font-family: inherit;
-                font-size: 0.95rem;
-            }
-            .custom-quill-editor .ql-toolbar {
-                border: none !important;
-                border-bottom: 1px solid #f1f5f9 !important;
-                padding: 6px 8px;
-            }
-            .custom-quill-editor .ql-editor {
-                min-height: 48px;
-                max-height: 150px;
-                padding: 12px;
-            }
-            .custom-quill-editor .ql-editor.ql-blank::before {
-                font-style: normal;
-                color: #94a3b8;
-            }
-          `}</style>
-        </div>
-      </footer>
+      <ChatInputArea 
+        conversation={conversation}
+        onSendMessage={onSendMessage}
+        currentUser={currentUser}
+        isInputDisabled={isInputDisabled}
+        isPast24hWindow={isPast24hWindow}
+      />
     </div>
   );
 }
