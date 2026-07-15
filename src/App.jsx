@@ -586,15 +586,21 @@ function App() {
     const formData = new FormData();
     if (messageData.file) formData.append('file', messageData.file);
     if (messageData.text) formData.append('text', messageData.text);
+    if (messageData.isTemplate) formData.append('is_template_fallback', 'true');
 
     try {
-        await authFetch(`${apiBaseUrl}/conversations/${selectedConversation.composite_id}/send`, {
+        const response = await authFetch(`${apiBaseUrl}/conversations/${selectedConversation.composite_id}/send`, {
             method: 'POST',
             body: formData,
         });
+        
+        if (!response.ok) {
+            const err = await response.json();
+            throw new Error(err.detail || 'Failed to send message.');
+        }
     } catch (err) {
         if (err.message !== 'Authentication failed') {
-            setError("Failed to send message.");
+            setError(err.message || "Failed to send message.");
         }
     }
   };
@@ -628,11 +634,13 @@ function App() {
         const errorData = await response.json();
         throw new Error(errorData.detail || 'An error occurred.');
       }
+      return true;
       // No need to refetch here, websocket will handle it
     } catch (err) {
         if (err.message !== 'Authentication failed') {
             setError(err.message);
         }
+        return false;
     }
   };
 
@@ -674,41 +682,18 @@ function App() {
   };
 
   const handleReopenThread = (compositeId) => {
-    const conversation = conversations.find(c => c.composite_id === compositeId);
-    
-    if (conversation) {
-        const userMessages = (conversation.messages || []).filter(m => m.sender === 'user');
-        let lastMessageDate = null;
-
-        if (userMessages.length > 0) {
-            lastMessageDate = new Date(userMessages[userMessages.length - 1].timestamp);
-        } else if (conversation.last_updated) {
-            lastMessageDate = new Date(conversation.last_updated);
-        }
-
-        if (lastMessageDate) {
-            const now = new Date();
-            const diffHours = (now - lastMessageDate) / (1000 * 60 * 60);
-
-            if (diffHours > 24) {
-                setModalState({
-                  isOpen: true,
-                  isAlert: true,
-                  message: 'Já se passaram 24h desde a última conversa recebida pelo cliente. Não é possível reabrir essa conversa.',
-                  onConfirm: null
-                });
-                return;
-            }
-        }
-    }
-
     setModalState({
       isOpen: true,
       message: 'Tem certeza que deseja reabrir esta conversa para enviar uma mensagem ao cliente?',
-      onConfirm: () => handleApiCall(
-        `${apiBaseUrl}/conversations/${compositeId}/reopen`,
-        { method: 'POST' }
-      ),
+      onConfirm: async () => {
+        const success = await handleApiCall(
+          `${apiBaseUrl}/conversations/${compositeId}/reopen`,
+          { method: 'POST' }
+        );
+        if (success) {
+            setActiveTab('Novos');
+        }
+      },
     });
   };
 
