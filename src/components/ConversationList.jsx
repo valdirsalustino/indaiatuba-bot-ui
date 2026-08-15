@@ -62,7 +62,8 @@ export default function ConversationList({
   filterLead = '',
   onFilterChange,
   activeTab = 'Novos',
-  setActiveTab
+  setActiveTab,
+  onNewConversation
 }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [isFiltersOpen, setIsFiltersOpen] = useState(false);
@@ -92,7 +93,7 @@ export default function ConversationList({
     // 1. Tab filtering
     let tabMatch = false;
     if (activeTab === 'Novos') {
-      tabMatch = conv.status === 'open';
+      tabMatch = conv.status === 'open' || conv.status === 'pending_template_reply';
     } else if (activeTab === 'Robô') {
       tabMatch = conv.status === 'closed_by_timeout' || conv.status === 'closed_by_user';
     } else if (activeTab === 'Departamento') {
@@ -175,6 +176,19 @@ export default function ConversationList({
           name="Robô" 
           title="Conversas encerradas pelo Robô ou pelo Cliente que não precisaram de atendimento humano." 
         />
+      </div>
+
+      {/* New Conversation Button */}
+      <div className="p-3 border-b border-gray-200 bg-gray-50">
+        <button
+          onClick={onNewConversation}
+          className="w-full flex justify-center items-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors"
+        >
+          <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+          </svg>
+          Iniciar nova conversa
+        </button>
       </div>
 
       {/* --- Collapsible Filter Panel — between header and search bar --- */}

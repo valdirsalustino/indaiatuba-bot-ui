@@ -14,6 +14,7 @@ import CalendarIntegration from './components/CalendarIntegration.jsx';
 import OAuthCallback from './components/OAuthCallback.jsx';
 import AdminCalendarView from './components/AdminCalendarView.jsx';
 import TopNavbar from './components/TopNavbar.jsx';
+import NewConversationModal from './components/NewConversationModal.jsx';
 import { useToast } from './context/ToastContext.jsx';
 
 // Logic to determine WebSocket protocol
@@ -87,6 +88,8 @@ function App() {
   const [features, setFeatures] = useState({ enable_google_calendar_scheduling: false });
   const [showTopics, setShowTopics] = useState(false);
   const [showLeads, setShowLeads] = useState(false);
+  const [isNewConversationModalOpen, setIsNewConversationModalOpen] = useState(false);
+  const [isSubmittingNewConversation, setIsSubmittingNewConversation] = useState(false);
   const [filterTopic, setFilterTopic] = useState('');
   const [filterLead, setFilterLead] = useState('');
   const [classificationLabels, setClassificationLabels] = useState({ topics: [], leads: [] });
@@ -549,7 +552,9 @@ function App() {
       const updatedConversation = conversations.find(
         (conv) => conv.composite_id === selectedConversation.composite_id
       );
-      setSelectedConversation(updatedConversation || null);
+      if (updatedConversation) {
+        setSelectedConversation(updatedConversation);
+      }
     }
   }, [conversations, selectedConversation?.composite_id]);
 
@@ -579,6 +584,51 @@ function App() {
     setSelectedConversation(conversation);
     setActiveView('conversations');
   };
+
+  const handleNewConversationSubmit = async (phoneNumber) => {
+    setIsSubmittingNewConversation(true);
+    try {
+      const response = await authFetch(`${apiBaseUrl}/conversations/proactive`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ phone_number: phoneNumber })
+      });
+      if (response.ok) {
+        const responseData = await response.json();
+        addToast('Conversa iniciada com sucesso.', 'success');
+        setIsNewConversationModalOpen(false);
+        
+        // Fetch the new conversation immediately and select it
+        if (responseData.composite_id) {
+          try {
+            const res = await authFetch(`${apiBaseUrl}/conversations/${responseData.composite_id}`);
+            if (res.ok) {
+              const newConv = await res.json();
+              setConversations(prev => {
+                if (prev.some(c => c.composite_id === newConv.composite_id)) return prev;
+                return [newConv, ...prev];
+              });
+              handleSelectConversation(newConv);
+            }
+          } catch (err) {
+            console.error("Failed to fetch new proactive conversation", err);
+          }
+        }
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        addToast(errorData.detail || 'Erro ao iniciar conversa.', 'error');
+      }
+    } catch (error) {
+      console.error("Error starting conversation:", error);
+      addToast(error.message || 'Erro de conexão.', 'error');
+    } finally {
+      setIsSubmittingNewConversation(true);
+      setTimeout(() => setIsSubmittingNewConversation(false), 500); // Small delay before reenabling
+    }
+  };
+
 
   const handleSendMessage = async (messageData) => {
     if (!selectedConversation) return;
@@ -788,6 +838,7 @@ function App() {
                 filterTopic={filterTopic}
                 filterLead={filterLead}
                 onFilterChange={handleFilterChange}
+                onNewConversation={() => setIsNewConversationModalOpen(true)}
               />
             )}
 
@@ -851,6 +902,13 @@ function App() {
                     token={token}
                 />
             )}
+
+            <NewConversationModal
+              isOpen={isNewConversationModalOpen}
+              onClose={() => setIsNewConversationModalOpen(false)}
+              onSubmit={handleNewConversationSubmit}
+              isSubmitting={isSubmittingNewConversation}
+            />
           </div>
         </div>
       } />
