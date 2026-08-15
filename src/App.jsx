@@ -173,9 +173,11 @@ function App() {
       }
 
       setConversations(prevConversations => {
+        // Build localMap from all prevConversations to preserve any real-time websocket messages
+        const localMap = new Map(prevConversations.map(c => [c.composite_id, c]));
+        
         // If it's a new page being loaded, append it. Otherwise, initialize it.
         const baseConversations = isLoadMore ? prevConversations : [];
-        const localMap = new Map(baseConversations.map(c => [c.composite_id, c]));
 
         const newConversations = serverData.map(serverConv => {
           const localConv = localMap.get(serverConv.composite_id);
@@ -435,7 +437,8 @@ function App() {
                   content_type: contentType,
                   message_id: data.data.message_id,
                   is_edited: data.data.is_edited,
-                  edited_at: data.data.edited_at
+                  edited_at: data.data.edited_at,
+                  status: data.data.status
               };
 
               const updatedConv = {
@@ -443,8 +446,6 @@ function App() {
                   messages: [...currentMessages, newMessage],
                   last_message: newMessage.text,
                   last_updated: newMessage.timestamp,
-                  // FAILSFE: If backend sends status changes attached to the message
-                  ...(data.data.status !== undefined && { status: data.data.status }),
                   ...(data.data.human_supervision !== undefined && { human_supervision: data.data.human_supervision })
               };
 
@@ -476,8 +477,26 @@ function App() {
               });
             });
           }
-          // ADDED 'conversation_closed' and 'status_changed' to catch bot closing events
-          else if (['new_handoff_request', 'conversation_resolved', 'supervision_type_changed', 'conversation_taken_over', 'conversation_closed', 'status_changed'].includes(data.update)) {
+          else if (data.update === 'status_changed' && data.data) {
+            setConversations(prevConversations => {
+              return prevConversations.map(conv => {
+                const hasMessage = conv.messages?.some(msg => msg.message_id === data.data.message_id);
+                if (!hasMessage) return conv;
+                return {
+                  ...conv,
+                  messages: conv.messages.map(msg => {
+                    if (msg.message_id !== data.data.message_id) return msg;
+                    return {
+                      ...msg,
+                      status: data.data.status,
+                    };
+                  }),
+                };
+              });
+            });
+          }
+          // ADDED 'conversation_closed' to catch bot closing events
+          else if (['new_handoff_request', 'conversation_resolved', 'supervision_type_changed', 'conversation_taken_over', 'conversation_closed', 'conversation_reopened'].includes(data.update)) {
 
             if (data.update === 'new_handoff_request') {
               try {
