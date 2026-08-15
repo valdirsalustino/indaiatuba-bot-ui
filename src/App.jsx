@@ -610,6 +610,7 @@ function App() {
                 if (prev.some(c => c.composite_id === newConv.composite_id)) return prev;
                 return [newConv, ...prev];
               });
+              setActiveTab('Novos');
               handleSelectConversation(newConv);
             }
           } catch (err) {
