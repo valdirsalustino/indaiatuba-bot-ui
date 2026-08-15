@@ -4,6 +4,9 @@ import remarkGfm from 'remark-gfm';
 
 const PencilIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg> );
 const DownloadIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5 mr-2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg> );
+const CheckIcon = ({ className }) => ( <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polyline points="20 6 9 17 4 12"></polyline></svg> );
+const CheckCheckIcon = ({ className, strokeWidth = "2" }) => ( <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M18 6 7 17l-5-5"/><path d="m22 10-7.5 7.5L13 16"/></svg> );
+const AlertIcon = ({ className }) => ( <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg> );
 
 const MediaRenderer = ({ msg }) => {
     switch (msg.content_type) {
@@ -41,6 +44,13 @@ const MESSAGE_THEMES = {
   }
 };
 
+const STATUS_TRANSLATIONS = {
+    'sent': 'Enviado',
+    'delivered': 'Entregue',
+    'read': 'Lido',
+    'failed': 'Falha'
+};
+
 export default function MessageBubble({ 
     msg, 
     index,
@@ -53,6 +63,7 @@ export default function MessageBubble({
 }) {
     const messageDate = new Date(msg.timestamp);
     const role = isUserMessage ? 'user' : (isAdminMessage ? 'admin' : 'default');
+    const isBotMessage = !isUserMessage && !isAdminMessage;
     const theme = MESSAGE_THEMES[role];
     const justification = isUserMessage ? 'justify-start' : 'justify-end';
     const nameAlignment = isUserMessage ? 'text-left self-start' : 'text-right self-end';
@@ -158,7 +169,17 @@ export default function MessageBubble({
                                 <PencilIcon />
                             </button>
                         )}
-                        <span className={`text-[10px] ${isAdminMessage ? 'text-indigo-200' : 'text-gray-400'}`}>{messageDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                        <div className="flex items-center gap-1">
+                            <span className={`text-[10px] ${isAdminMessage ? 'text-indigo-200' : 'text-gray-400'}`}>{messageDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                            {(isAdminMessage || isBotMessage) && msg.status && (
+                                <span className="flex items-center" title={STATUS_TRANSLATIONS[msg.status] || msg.status}>
+                                    {msg.status === 'sent' && <CheckIcon className={isAdminMessage ? "text-indigo-200" : "text-gray-400"} />}
+                                    {msg.status === 'delivered' && <CheckCheckIcon className={isAdminMessage ? "text-indigo-200" : "text-gray-400"} />}
+                                    {msg.status === 'read' && <CheckCheckIcon className="text-[#39ff14] drop-shadow-md" strokeWidth="3" />}
+                                    {msg.status === 'failed' && <AlertIcon className="text-red-400" />}
+                                </span>
+                            )}
+                        </div>
                     </div>
                 </div>
             </div>

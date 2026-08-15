@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Avatar from './Avatar.jsx';
 import ChatInputArea from './ChatInputArea.jsx';
 import MessageBubble from './MessageBubble.jsx';
@@ -34,7 +34,7 @@ export default function ChatWindow({ conversation, onSendMessage, onEditMessage,
 
 
   // --- 24h Window Detection ---
-  const isPast24hWindow = useMemo(() => isWhatsAppWindowClosed(conversation?.messages), [conversation?.messages]);
+  const isPast24hWindow = conversation ? !conversation.is_within_24h_window : true;
 
   if (!conversation) {
     return (
