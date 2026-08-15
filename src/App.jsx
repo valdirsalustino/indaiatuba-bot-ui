@@ -585,6 +585,23 @@ function App() {
     setActiveView('conversations');
   };
 
+  const loadAndSelectConversation = async (compositeId, errorMessage = "Failed to fetch conversation") => {
+    try {
+      const res = await authFetch(`${apiBaseUrl}/conversations/${compositeId}`);
+      if (res.ok) {
+        const fetchedConv = await res.json();
+        setConversations(prev => {
+          if (prev.some(c => c.composite_id === fetchedConv.composite_id)) return prev;
+          return [fetchedConv, ...prev];
+        });
+        setActiveTab('Novos');
+        handleSelectConversation(fetchedConv);
+      }
+    } catch (err) {
+      console.error(errorMessage, err);
+    }
+  };
+
   const handleNewConversationSubmit = async (phoneNumber) => {
     setIsSubmittingNewConversation(true);
     try {
@@ -599,33 +616,24 @@ function App() {
         const responseData = await response.json();
         setIsNewConversationModalOpen(false);
         
-        // Fetch the new conversation immediately and select it
         if (responseData.composite_id) {
-          try {
-            const res = await authFetch(`${apiBaseUrl}/conversations/${responseData.composite_id}`);
-            if (res.ok) {
-              const newConv = await res.json();
-              setConversations(prev => {
-                if (prev.some(c => c.composite_id === newConv.composite_id)) return prev;
-                return [newConv, ...prev];
-              });
-              setActiveTab('Novos');
-              handleSelectConversation(newConv);
-            }
-          } catch (err) {
-            console.error("Failed to fetch new proactive conversation", err);
-          }
+          await loadAndSelectConversation(responseData.composite_id, "Failed to fetch new proactive conversation");
         }
       } else {
         const errorData = await response.json().catch(() => ({}));
-        addToast(errorData.detail || 'Erro ao iniciar conversa.', 'error');
+        if (response.status === 400 && errorData.composite_id) {
+          setIsNewConversationModalOpen(false);
+          addToast(errorData.detail || 'Já existe uma conversa ativa com este número.', 'warning');
+          await loadAndSelectConversation(errorData.composite_id, "Failed to fetch existing proactive conversation");
+        } else {
+          addToast(errorData.detail || 'Erro ao iniciar conversa.', 'error');
+        }
       }
     } catch (error) {
       console.error("Error starting conversation:", error);
       addToast(error.message || 'Erro de conexão.', 'error');
     } finally {
-      setIsSubmittingNewConversation(true);
-      setTimeout(() => setIsSubmittingNewConversation(false), 500); // Small delay before reenabling
+      setIsSubmittingNewConversation(false);
     }
   };
 

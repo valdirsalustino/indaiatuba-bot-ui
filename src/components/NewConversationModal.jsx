@@ -7,9 +7,10 @@ export default function NewConversationModal({ isOpen, onClose, onSubmit, isSubm
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    // basic validation
-    if (!phoneNumber) return;
-    onSubmit(phoneNumber);
+    // Sanitize phone number to keep only digits
+    const sanitizedNumber = phoneNumber.replace(/\D/g, '');
+    if (!sanitizedNumber) return;
+    onSubmit(sanitizedNumber);
   };
 
   return (
