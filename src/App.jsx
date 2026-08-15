@@ -597,7 +597,6 @@ function App() {
       });
       if (response.ok) {
         const responseData = await response.json();
-        addToast('Conversa iniciada com sucesso.', 'success');
         setIsNewConversationModalOpen(false);
         
         // Fetch the new conversation immediately and select it
