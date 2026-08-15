@@ -94,7 +94,7 @@ export default function ConversationList({
     let tabMatch = false;
     if (activeTab === 'Novos') {
       tabMatch = conv.status === 'open' || conv.status === 'pending_template_reply';
-    } else if (activeTab === 'Robô') {
+    } else if (activeTab === 'Bot') {
       tabMatch = conv.status === 'closed_by_timeout' || conv.status === 'closed_by_user';
     } else if (activeTab === 'Departamento') {
       tabMatch = conv.status === 'closed_by_assistant';
@@ -119,7 +119,7 @@ export default function ConversationList({
   const getTabCount = (tabName) => {
     return sortedConversations.filter(conv => {
         if (tabName === 'Novos') return conv.status === 'open';
-        if (tabName === 'Robô') return conv.status === 'closed_by_timeout' || conv.status === 'closed_by_user';
+        if (tabName === 'Bot') return conv.status === 'closed_by_timeout' || conv.status === 'closed_by_user';
         if (tabName === 'Departamento') return conv.status === 'closed_by_assistant';
         return false;
     }).length;
@@ -173,8 +173,8 @@ export default function ConversationList({
           title="Conversas encerradas direcionadas ao seu departamento." 
         />
         <TabButton 
-          name="Robô" 
-          title="Conversas encerradas pelo Robô ou pelo Cliente que não precisaram de atendimento humano." 
+          name="Bot" 
+          title="Conversas encerradas pelo Bot ou pelo Cliente que não precisaram de atendimento humano." 
         />
       </div>
 
