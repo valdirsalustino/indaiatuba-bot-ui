@@ -621,15 +621,20 @@ function App() {
     }
   };
 
-  const handleNewConversationSubmit = async (phoneNumber) => {
+  const handleNewConversationSubmit = async (phoneNumber, clientName) => {
     setIsSubmittingNewConversation(true);
     try {
+      const payload = { phone_number: phoneNumber };
+      if (clientName) {
+        payload.client_name = clientName;
+      }
+      
       const response = await authFetch(`${apiBaseUrl}/conversations/proactive`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ phone_number: phoneNumber })
+        body: JSON.stringify(payload)
       });
       if (response.ok) {
         const responseData = await response.json();
@@ -934,6 +939,13 @@ function App() {
               isOpen={isNewConversationModalOpen}
               onClose={() => setIsNewConversationModalOpen(false)}
               onSubmit={handleNewConversationSubmit}
+              onCheckPhone={async (phone) => {
+                const res = await authFetch(`${apiBaseUrl}/conversations/check-phone/${encodeURIComponent(phone)}`);
+                if (res.ok) {
+                  return await res.json();
+                }
+                return { exists: false };
+              }}
               isSubmitting={isSubmittingNewConversation}
             />
           </div>
