@@ -403,7 +403,17 @@ function App() {
                    setConversations(prev => {
                        // Double check it wasn't added while we were fetching
                        if (prev.some(c => c.composite_id === newConv.composite_id)) return prev;
-                       return [newConv, ...prev];
+                       
+                       // Sync 24h window flag for other loaded threads of this client
+                       const reset24hWindow = newConv.is_within_24h_window;
+                       const updatedPrev = prev.map(c => {
+                           if (reset24hWindow && c.phone_number === newConv.phone_number) {
+                               return { ...c, is_within_24h_window: true };
+                           }
+                           return c;
+                       });
+                       
+                       return [newConv, ...updatedPrev];
                    });
                 })
                 .catch(err => console.error("Error fetching new conversation:", err));
@@ -461,10 +471,20 @@ function App() {
                   ...(data.data.human_supervision !== undefined && { human_supervision: data.data.human_supervision })
               };
 
+              const reset24hWindow = newMessage.sender === 'user';
+              if (reset24hWindow) {
+                  updatedConv.is_within_24h_window = true;
+              }
+
               const otherConvs = [
                   ...prevConversations.slice(0, targetIndex),
                   ...prevConversations.slice(targetIndex + 1)
-              ];
+              ].map(c => {
+                  if (reset24hWindow && c.phone_number === targetConv.phone_number) {
+                      return { ...c, is_within_24h_window: true };
+                  }
+                  return c;
+              });
 
               return [updatedConv, ...otherConvs];
             });

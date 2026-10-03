@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import Avatar from './Avatar.jsx';
 import ChatInputArea from './ChatInputArea.jsx';
 import MessageBubble from './MessageBubble.jsx';
-import { isWhatsAppWindowClosed } from '../utils/whatsapp.js';
 
 // --- ICONS ---
 const SolvedIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1.5"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg> );
@@ -34,7 +33,7 @@ export default function ChatWindow({ conversation, onSendMessage, onEditMessage,
 
 
   // --- 24h Window Detection ---
-  const isPast24hWindow = conversation ? isWhatsAppWindowClosed(conversation.messages) : true;
+  const isPast24hWindow = conversation ? !conversation.is_within_24h_window : true;
 
   if (!conversation) {
     return (
