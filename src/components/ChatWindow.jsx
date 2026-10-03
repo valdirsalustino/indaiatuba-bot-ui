@@ -34,7 +34,7 @@ export default function ChatWindow({ conversation, onSendMessage, onEditMessage,
 
 
   // --- 24h Window Detection ---
-  const isPast24hWindow = conversation ? !conversation.is_within_24h_window : true;
+  const isPast24hWindow = conversation ? isWhatsAppWindowClosed(conversation.messages) : true;
 
   if (!conversation) {
     return (
