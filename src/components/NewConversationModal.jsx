@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import PhoneInput, { isValidPhoneNumber } from 'react-phone-number-input';
+import 'react-phone-number-input/style.css';
 
 export default function NewConversationModal({ isOpen, onClose, onSubmit, onCheckPhone, isSubmitting }) {
   const [step, setStep] = useState(1);
@@ -21,12 +23,13 @@ export default function NewConversationModal({ isOpen, onClose, onSubmit, onChec
 
   const handleVerify = async (e) => {
     e.preventDefault();
-    const sanitizedNumber = phoneNumber.replace(/\D/g, '');
-    if (!sanitizedNumber) return;
+    if (!phoneNumber || !isValidPhoneNumber(phoneNumber)) return;
     
+    // phoneNumber from PhoneInput is already in E.164 format (e.g. +5511999999999)
+    // The backend lstrips the '+' sign.
     setIsCheckingPhone(true);
     try {
-      const result = await onCheckPhone(sanitizedNumber);
+      const result = await onCheckPhone(phoneNumber);
       if (result.exists) {
         setExistingUser(result.user_name);
       } else {
@@ -45,9 +48,8 @@ export default function NewConversationModal({ isOpen, onClose, onSubmit, onChec
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    const sanitizedNumber = phoneNumber.replace(/\D/g, '');
-    if (!sanitizedNumber) return;
-    onSubmit(sanitizedNumber, existingUser ? null : clientName);
+    if (!phoneNumber || !isValidPhoneNumber(phoneNumber)) return;
+    onSubmit(phoneNumber, existingUser ? null : clientName);
   };
 
   return (
@@ -68,18 +70,17 @@ export default function NewConversationModal({ isOpen, onClose, onSubmit, onChec
               <label htmlFor="phoneNumber" className="block text-sm font-medium text-gray-700 mb-1">
                 Número de Telefone (WhatsApp)
               </label>
-              <input
-                type="text"
-                id="phoneNumber"
+              <PhoneInput
+                international
+                defaultCountry="BR"
                 value={phoneNumber}
-                onChange={(e) => setPhoneNumber(e.target.value)}
-                placeholder="+5511999999999"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                required
+                onChange={setPhoneNumber}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus-within:ring-2 focus-within:ring-blue-500 bg-white text-gray-700"
                 disabled={isCheckingPhone}
+                id="phoneNumber"
               />
               <p className="mt-1 text-xs text-gray-500">
-                Formato internacional (+55 seguido do DDD e número).
+                Digite o número com o DDD. O código do país pode ser alterado clicando na bandeira.
               </p>
             </div>
             
@@ -94,8 +95,8 @@ export default function NewConversationModal({ isOpen, onClose, onSubmit, onChec
               </button>
               <button
                 type="submit"
-                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md transition-colors flex items-center"
-                disabled={isCheckingPhone || !phoneNumber}
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:hover:bg-gray-400 disabled:cursor-not-allowed rounded-md transition-colors flex items-center"
+                disabled={isCheckingPhone || !phoneNumber || !isValidPhoneNumber(phoneNumber)}
               >
                 {isCheckingPhone ? (
                   <>
@@ -155,7 +156,7 @@ export default function NewConversationModal({ isOpen, onClose, onSubmit, onChec
               </button>
               <button
                 type="submit"
-                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md transition-colors flex items-center"
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:hover:bg-gray-400 disabled:cursor-not-allowed rounded-md transition-colors flex items-center"
                 disabled={isSubmitting || (!existingUser && !clientName)}
               >
                 {isSubmitting ? (
