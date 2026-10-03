@@ -187,15 +187,27 @@ function App() {
           const serverMsgs = serverConv.messages || [];
           const localMsgs = localConv.messages || [];
 
-          const serverMsgSignatures = new Set(
-            serverMsgs.map(m => `${m.timestamp}-${m.text}`)
-          );
+          const serverMsgSignatures = new Set();
+          serverMsgs.forEach(m => {
+            if (m.message_id) {
+              serverMsgSignatures.add(m.message_id);
+            }
+            if (m.timestamp && m.text) {
+              const timeNumeric = new Date(m.timestamp).getTime();
+              serverMsgSignatures.add(`${timeNumeric}-${m.text}`);
+            }
+          });
 
           const mergedMessages = [...serverMsgs];
 
           localMsgs.forEach(localMsg => {
-            const key = `${localMsg.timestamp}-${localMsg.text}`;
-            if (!serverMsgSignatures.has(key)) {
+            const hasIdMatch = localMsg.message_id && serverMsgSignatures.has(localMsg.message_id);
+            
+            const timeNumeric = localMsg.timestamp ? new Date(localMsg.timestamp).getTime() : null;
+            const fallbackKey = `${timeNumeric}-${localMsg.text}`;
+            const hasFallbackMatch = timeNumeric && serverMsgSignatures.has(fallbackKey);
+            
+            if (!hasIdMatch && !hasFallbackMatch) {
               mergedMessages.push(localMsg);
             }
           });
