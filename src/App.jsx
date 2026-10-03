@@ -971,6 +971,8 @@ function App() {
               isOpen={isNewConversationModalOpen}
               onClose={() => setIsNewConversationModalOpen(false)}
               onSubmit={handleNewConversationSubmit}
+              apiBaseUrl={apiBaseUrl}
+              authFetch={authFetch}
               onCheckPhone={async (phone) => {
                 const res = await authFetch(`${apiBaseUrl}/conversations/check-phone/${encodeURIComponent(phone)}`);
                 if (res.ok) {
