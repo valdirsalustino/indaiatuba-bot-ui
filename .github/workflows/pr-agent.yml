@@ -18,3 +18,4 @@ jobs:
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          pr_agent.config.model: "gemini/gemini-3.1-pro"
