@@ -14,6 +14,7 @@ import CalendarIntegration from './components/CalendarIntegration.jsx';
 import OAuthCallback from './components/OAuthCallback.jsx';
 import AdminCalendarView from './components/AdminCalendarView.jsx';
 import TopNavbar from './components/TopNavbar.jsx';
+import NewConversationModal from './components/NewConversationModal.jsx';
 import { useToast } from './context/ToastContext.jsx';
 
 // Logic to determine WebSocket protocol
@@ -87,6 +88,8 @@ function App() {
   const [features, setFeatures] = useState({ enable_google_calendar_scheduling: false });
   const [showTopics, setShowTopics] = useState(false);
   const [showLeads, setShowLeads] = useState(false);
+  const [isNewConversationModalOpen, setIsNewConversationModalOpen] = useState(false);
+  const [isSubmittingNewConversation, setIsSubmittingNewConversation] = useState(false);
   const [filterTopic, setFilterTopic] = useState('');
   const [filterLead, setFilterLead] = useState('');
   const [classificationLabels, setClassificationLabels] = useState({ topics: [], leads: [] });
@@ -170,9 +173,11 @@ function App() {
       }
 
       setConversations(prevConversations => {
+        // Build localMap from all prevConversations to preserve any real-time websocket messages
+        const localMap = new Map(prevConversations.map(c => [c.composite_id, c]));
+        
         // If it's a new page being loaded, append it. Otherwise, initialize it.
         const baseConversations = isLoadMore ? prevConversations : [];
-        const localMap = new Map(baseConversations.map(c => [c.composite_id, c]));
 
         const newConversations = serverData.map(serverConv => {
           const localConv = localMap.get(serverConv.composite_id);
@@ -182,15 +187,27 @@ function App() {
           const serverMsgs = serverConv.messages || [];
           const localMsgs = localConv.messages || [];
 
-          const serverMsgSignatures = new Set(
-            serverMsgs.map(m => `${m.timestamp}-${m.text}`)
-          );
+          const serverMsgSignatures = new Set();
+          serverMsgs.forEach(m => {
+            if (m.message_id) {
+              serverMsgSignatures.add(m.message_id);
+            }
+            if (m.timestamp && m.text) {
+              const timeNumeric = new Date(m.timestamp).getTime();
+              serverMsgSignatures.add(`${timeNumeric}-${m.text}`);
+            }
+          });
 
           const mergedMessages = [...serverMsgs];
 
           localMsgs.forEach(localMsg => {
-            const key = `${localMsg.timestamp}-${localMsg.text}`;
-            if (!serverMsgSignatures.has(key)) {
+            const hasIdMatch = localMsg.message_id && serverMsgSignatures.has(localMsg.message_id);
+            
+            const timeNumeric = localMsg.timestamp ? new Date(localMsg.timestamp).getTime() : null;
+            const fallbackKey = `${timeNumeric}-${localMsg.text}`;
+            const hasFallbackMatch = timeNumeric && serverMsgSignatures.has(fallbackKey);
+            
+            if (!hasIdMatch && !hasFallbackMatch) {
               mergedMessages.push(localMsg);
             }
           });
@@ -386,7 +403,17 @@ function App() {
                    setConversations(prev => {
                        // Double check it wasn't added while we were fetching
                        if (prev.some(c => c.composite_id === newConv.composite_id)) return prev;
-                       return [newConv, ...prev];
+                       
+                       // Sync 24h window flag for other loaded threads of this client
+                       const reset24hWindow = newConv.is_within_24h_window;
+                       const updatedPrev = prev.map(c => {
+                           if (reset24hWindow && c.phone_number === newConv.phone_number) {
+                               return { ...c, is_within_24h_window: true };
+                           }
+                           return c;
+                       });
+                       
+                       return [newConv, ...updatedPrev];
                    });
                 })
                 .catch(err => console.error("Error fetching new conversation:", err));
@@ -432,7 +459,8 @@ function App() {
                   content_type: contentType,
                   message_id: data.data.message_id,
                   is_edited: data.data.is_edited,
-                  edited_at: data.data.edited_at
+                  edited_at: data.data.edited_at,
+                  status: data.data.status
               };
 
               const updatedConv = {
@@ -440,15 +468,23 @@ function App() {
                   messages: [...currentMessages, newMessage],
                   last_message: newMessage.text,
                   last_updated: newMessage.timestamp,
-                  // FAILSFE: If backend sends status changes attached to the message
-                  ...(data.data.status !== undefined && { status: data.data.status }),
                   ...(data.data.human_supervision !== undefined && { human_supervision: data.data.human_supervision })
               };
+
+              const reset24hWindow = newMessage.sender === 'user';
+              if (reset24hWindow) {
+                  updatedConv.is_within_24h_window = true;
+              }
 
               const otherConvs = [
                   ...prevConversations.slice(0, targetIndex),
                   ...prevConversations.slice(targetIndex + 1)
-              ];
+              ].map(c => {
+                  if (reset24hWindow && c.phone_number === targetConv.phone_number) {
+                      return { ...c, is_within_24h_window: true };
+                  }
+                  return c;
+              });
 
               return [updatedConv, ...otherConvs];
             });
@@ -473,8 +509,26 @@ function App() {
               });
             });
           }
-          // ADDED 'conversation_closed' and 'status_changed' to catch bot closing events
-          else if (['new_handoff_request', 'conversation_resolved', 'supervision_type_changed', 'conversation_taken_over', 'conversation_closed', 'status_changed'].includes(data.update)) {
+          else if (data.update === 'status_changed' && data.data) {
+            setConversations(prevConversations => {
+              return prevConversations.map(conv => {
+                const hasMessage = conv.messages?.some(msg => msg.message_id === data.data.message_id);
+                if (!hasMessage) return conv;
+                return {
+                  ...conv,
+                  messages: conv.messages.map(msg => {
+                    if (msg.message_id !== data.data.message_id) return msg;
+                    return {
+                      ...msg,
+                      status: data.data.status,
+                    };
+                  }),
+                };
+              });
+            });
+          }
+          // ADDED 'conversation_closed' to catch bot closing events
+          else if (['new_handoff_request', 'conversation_resolved', 'supervision_type_changed', 'conversation_taken_over', 'conversation_closed', 'conversation_reopened'].includes(data.update)) {
 
             if (data.update === 'new_handoff_request') {
               try {
@@ -549,7 +603,9 @@ function App() {
       const updatedConversation = conversations.find(
         (conv) => conv.composite_id === selectedConversation.composite_id
       );
-      setSelectedConversation(updatedConversation || null);
+      if (updatedConversation) {
+        setSelectedConversation(updatedConversation);
+      }
     }
   }, [conversations, selectedConversation?.composite_id]);
 
@@ -579,6 +635,64 @@ function App() {
     setSelectedConversation(conversation);
     setActiveView('conversations');
   };
+
+  const loadAndSelectConversation = async (compositeId, errorMessage = "Failed to fetch conversation") => {
+    try {
+      const res = await authFetch(`${apiBaseUrl}/conversations/${compositeId}`);
+      if (res.ok) {
+        const fetchedConv = await res.json();
+        setConversations(prev => {
+          if (prev.some(c => c.composite_id === fetchedConv.composite_id)) return prev;
+          return [fetchedConv, ...prev];
+        });
+        setActiveTab('Novos');
+        handleSelectConversation(fetchedConv);
+      }
+    } catch (err) {
+      console.error(errorMessage, err);
+    }
+  };
+
+  const handleNewConversationSubmit = async (phoneNumber, clientName) => {
+    setIsSubmittingNewConversation(true);
+    try {
+      const payload = { phone_number: phoneNumber };
+      if (clientName) {
+        payload.client_name = clientName;
+      }
+      
+      const response = await authFetch(`${apiBaseUrl}/conversations/proactive`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload)
+      });
+      if (response.ok) {
+        const responseData = await response.json();
+        setIsNewConversationModalOpen(false);
+        
+        if (responseData.composite_id) {
+          await loadAndSelectConversation(responseData.composite_id, "Failed to fetch new proactive conversation");
+        }
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        if (response.status === 400 && errorData.composite_id) {
+          setIsNewConversationModalOpen(false);
+          addToast(errorData.detail || 'Já existe uma conversa ativa com este número.', 'warning');
+          await loadAndSelectConversation(errorData.composite_id, "Failed to fetch existing proactive conversation");
+        } else {
+          addToast(errorData.detail || 'Erro ao iniciar conversa.', 'error');
+        }
+      }
+    } catch (error) {
+      console.error("Error starting conversation:", error);
+      addToast(error.message || 'Erro de conexão.', 'error');
+    } finally {
+      setIsSubmittingNewConversation(false);
+    }
+  };
+
 
   const handleSendMessage = async (messageData) => {
     if (!selectedConversation) return;
@@ -788,6 +902,7 @@ function App() {
                 filterTopic={filterTopic}
                 filterLead={filterLead}
                 onFilterChange={handleFilterChange}
+                onNewConversation={() => setIsNewConversationModalOpen(true)}
               />
             )}
 
@@ -851,6 +966,22 @@ function App() {
                     token={token}
                 />
             )}
+
+            <NewConversationModal
+              isOpen={isNewConversationModalOpen}
+              onClose={() => setIsNewConversationModalOpen(false)}
+              onSubmit={handleNewConversationSubmit}
+              apiBaseUrl={apiBaseUrl}
+              authFetch={authFetch}
+              onCheckPhone={async (phone) => {
+                const res = await authFetch(`${apiBaseUrl}/conversations/check-phone/${encodeURIComponent(phone)}`);
+                if (res.ok) {
+                  return await res.json();
+                }
+                return { exists: false };
+              }}
+              isSubmitting={isSubmittingNewConversation}
+            />
           </div>
         </div>
       } />
