@@ -83,7 +83,8 @@ export default function ClientConfigurations({ apiBaseUrl, token, onAction }) {
         whatsapp_access_token: '',
         whatsapp_phone_number_id: '',
         tavily_api_key: '',
-        google_api_key: ''
+        google_api_key: '',
+        deepseek_api_key: ''
     });
     const [secretsMetadata, setSecretsMetadata] = useState(null);
     const [loadingSecrets, setLoadingSecrets] = useState(false);
@@ -926,7 +927,7 @@ export default function ClientConfigurations({ apiBaseUrl, token, onAction }) {
 
             if (response.ok) {
                 setIsEditingSecrets(false);
-                setSecrets({ whatsapp_access_token: '', whatsapp_phone_number_id: '', tavily_api_key: '', google_api_key: '' });
+                setSecrets({ whatsapp_access_token: '', whatsapp_phone_number_id: '', tavily_api_key: '', google_api_key: '', deepseek_api_key: '' });
                 setActiveTab('secrets');
             } else {
                 const errorData = await response.json().catch(() => ({}));
@@ -1593,7 +1594,8 @@ export default function ClientConfigurations({ apiBaseUrl, token, onAction }) {
                             {[
                                 { id: 'whatsapp_access_token', label: 'WhatsApp Access Token', meta: 'has_whatsapp_token' },
                                 { id: 'tavily_api_key', label: 'Tavily API Key', meta: 'has_tavily_key' },
-                                { id: 'google_api_key', label: 'Google API Key', meta: 'has_google_key' }
+                                { id: 'google_api_key', label: 'Google API Key', meta: 'has_google_key' },
+                                { id: 'deepseek_api_key', label: 'DeepSeek API Key', meta: 'has_deepseek_key' }
                             ].map((field) => (
                                 <div key={field.id}>
                                     <label className="block text-sm font-medium text-gray-600 mb-1">
