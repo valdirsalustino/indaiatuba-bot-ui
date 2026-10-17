@@ -192,9 +192,13 @@ function App() {
             if (m.message_id) {
               serverMsgSignatures.add(m.message_id);
             }
-            if (m.timestamp && m.text) {
+            const cleanMediaKey = m.media_url ? m.media_url.split('?')[0] : '';
+            if (m.timestamp && (m.text || cleanMediaKey)) {
               const timeNumeric = new Date(m.timestamp).getTime();
-              serverMsgSignatures.add(`${timeNumeric}-${m.text}`);
+              serverMsgSignatures.add(`${timeNumeric}-${m.text || ''}-${cleanMediaKey}`);
+              if (m.text) {
+                serverMsgSignatures.add(`${timeNumeric}-${m.text}`);
+              }
             }
           });
 
@@ -204,8 +208,13 @@ function App() {
             const hasIdMatch = localMsg.message_id && serverMsgSignatures.has(localMsg.message_id);
             
             const timeNumeric = localMsg.timestamp ? new Date(localMsg.timestamp).getTime() : null;
-            const fallbackKey = `${timeNumeric}-${localMsg.text}`;
-            const hasFallbackMatch = timeNumeric && serverMsgSignatures.has(fallbackKey);
+            const cleanLocalMediaKey = localMsg.media_url ? localMsg.media_url.split('?')[0] : '';
+            const fallbackKey = `${timeNumeric}-${localMsg.text || ''}-${cleanLocalMediaKey}`;
+            const legacyFallbackKey = `${timeNumeric}-${localMsg.text}`;
+            const hasFallbackMatch = timeNumeric && (
+              serverMsgSignatures.has(fallbackKey) ||
+              (localMsg.text && serverMsgSignatures.has(legacyFallbackKey))
+            );
             
             if (!hasIdMatch && !hasFallbackMatch) {
               mergedMessages.push(localMsg);
@@ -218,10 +227,16 @@ function App() {
             ? mergedMessages[mergedMessages.length - 1]
             : null;
 
+          const lastMsgPreview = lastMsg
+            ? (lastMsg.text || (lastMsg.content_type && lastMsg.content_type !== 'text'
+                ? `[${lastMsg.content_type.charAt(0).toUpperCase() + lastMsg.content_type.slice(1)}]`
+                : serverConv.last_message))
+            : serverConv.last_message;
+
           return {
             ...serverConv,
             messages: mergedMessages,
-            last_message: lastMsg ? lastMsg.text : serverConv.last_message,
+            last_message: lastMsgPreview,
             last_updated: lastMsg ? lastMsg.timestamp : serverConv.last_updated
           };
         });
@@ -430,10 +445,18 @@ function App() {
               const targetConv = prevConversations[targetIndex];
               const currentMessages = targetConv.messages || [];
 
-              const isDuplicate = currentMessages.some(msg =>
-                  msg.text === data.data.text &&
-                  msg.timestamp === data.data.timestamp
-              );
+              const incomingCleanMedia = data.data.media_url ? data.data.media_url.split('?')[0] : '';
+              const isDuplicate = currentMessages.some(msg => {
+                  if (data.data.message_id && msg.message_id) {
+                    return msg.message_id === data.data.message_id;
+                  }
+                  const msgCleanMedia = msg.media_url ? msg.media_url.split('?')[0] : '';
+                  return (
+                    msg.text === data.data.text &&
+                    msg.timestamp === data.data.timestamp &&
+                    msgCleanMedia === incomingCleanMedia
+                  );
+              });
               if (isDuplicate) return prevConversations;
 
               let contentType = 'text';
@@ -463,10 +486,16 @@ function App() {
                   status: data.data.status
               };
 
+              const previewText = newMessage.text || (
+                  contentType !== 'text'
+                    ? `[${contentType.charAt(0).toUpperCase() + contentType.slice(1)}]`
+                    : targetConv.last_message
+              );
+
               const updatedConv = {
                   ...targetConv,
                   messages: [...currentMessages, newMessage],
-                  last_message: newMessage.text,
+                  last_message: previewText,
                   last_updated: newMessage.timestamp,
                   ...(data.data.human_supervision !== undefined && { human_supervision: data.data.human_supervision })
               };
