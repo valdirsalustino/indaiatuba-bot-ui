@@ -77,6 +77,11 @@ export default function ClientConfigurations({ apiBaseUrl, token, onAction }) {
     const [googleDriverIdError, setGoogleDriverIdError] = useState('');
     const [isEditingGoogleDriverId, setIsEditingGoogleDriverId] = useState(false);
     const [savingGoogleDriverId, setSavingGoogleDriverId] = useState(false);
+    const [patientFolders, setPatientFolders] = useState([]);
+    const [patientFoldersError, setPatientFoldersError] = useState('');
+    const [editingPatientFolderIndex, setEditingPatientFolderIndex] = useState(null);
+    const [savingPatientFolderIndex, setSavingPatientFolderIndex] = useState(null);
+    const [originalPatientFolderToEdit, setOriginalPatientFolderToEdit] = useState(null);
 
     // --- Secrets States ---
     const [secrets, setSecrets] = useState({
@@ -340,17 +345,24 @@ export default function ClientConfigurations({ apiBaseUrl, token, onAction }) {
              const fetchGoogleDriverId = async () => {
                  setLoadingGoogleDriverId(true);
                  setGoogleDriverIdError('');
+                 setPatientFoldersError('');
                  try {
-                     const url = `${apiBaseUrl}/google-driver-id`;
-                     const response = await fetch(url, {
-                         headers: { 'Authorization': `Bearer ${token}` }
-                     });
+                     const headers = { 'Authorization': `Bearer ${token}` };
+                     const [response, featuresRes] = await Promise.all([
+                         fetch(`${apiBaseUrl}/google-driver-id`, { headers }),
+                         fetch(`${apiBaseUrl}/features`, { headers })
+                     ]);
                      if (response.ok) {
                          const data = await response.json();
                          setGoogleDriverId(data.folder_id || '');
+                         setPatientFolders(Array.isArray(data.patient_folders) ? data.patient_folders : []);
                      } else if (response.status !== 404) {
                          const errorData = await response.json().catch(() => ({}));
                          throw new Error(errorData.detail || 'Erro ao carregar Google Driver ID');
+                     }
+                     if (featuresRes.ok) {
+                         const featData = await featuresRes.json();
+                         setEnableGoogleCalendarScheduling(featData.enable_google_calendar_scheduling || false);
                      }
                  } catch (error) {
                      setGoogleDriverIdError(error.message);
@@ -905,6 +917,124 @@ export default function ClientConfigurations({ apiBaseUrl, token, onAction }) {
         } finally {
             setSavingGoogleDriverId(false);
         }
+    };
+
+    const handleSavePatientFolder = async (index) => {
+        const currentFolder = patientFolders[index];
+        const trimmedFolder = {
+            name: (currentFolder.name || '').trim(),
+            url: (currentFolder.url || '').trim()
+        };
+        setSavingPatientFolderIndex(index);
+        setPatientFoldersError('');
+        try {
+            const url = `${apiBaseUrl}/google-driver-id/patient-folders`;
+            const payload = { folder: trimmedFolder };
+            if (originalPatientFolderToEdit && originalPatientFolderToEdit.name) {
+                payload.old_name = originalPatientFolderToEdit.name;
+            }
+            const response = await fetch(url, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(payload)
+            });
+
+            if (response.ok) {
+                const updatedFolders = [...patientFolders];
+                updatedFolders[index] = trimmedFolder;
+                setPatientFolders(updatedFolders);
+                setEditingPatientFolderIndex(null);
+                setOriginalPatientFolderToEdit(null);
+            } else {
+                const errorData = await response.json().catch(() => ({}));
+                setPatientFoldersError(errorData.detail || `Erro ao salvar pasta: Status ${response.status}`);
+            }
+        } catch (error) {
+            setPatientFoldersError(error.message || 'Falha ao salvar pasta.');
+        } finally {
+            setSavingPatientFolderIndex(null);
+        }
+    };
+
+    const handlePatientFolderChange = (index, field, value) => {
+        const newFolders = [...patientFolders];
+        newFolders[index] = { ...newFolders[index], [field]: value };
+        setPatientFolders(newFolders);
+    };
+
+    const handleAddPatientFolder = () => {
+        if (editingPatientFolderIndex !== null) {
+            return;
+        }
+        setPatientFoldersError('');
+        setPatientFolders([...patientFolders, { name: '', url: '' }]);
+        setEditingPatientFolderIndex(patientFolders.length);
+        setOriginalPatientFolderToEdit(null);
+    };
+
+    const handleCancelEditPatientFolder = (index) => {
+        setPatientFoldersError('');
+        if (!originalPatientFolderToEdit) {
+            const updatedFolders = patientFolders.filter((_, i) => i !== index);
+            setPatientFolders(updatedFolders);
+        } else {
+            const updatedFolders = [...patientFolders];
+            updatedFolders[index] = { ...originalPatientFolderToEdit };
+            setPatientFolders(updatedFolders);
+        }
+        setEditingPatientFolderIndex(null);
+        setOriginalPatientFolderToEdit(null);
+    };
+
+    const handleRemovePatientFolder = (indexToRemove) => {
+        const folderToRemove = patientFolders[indexToRemove];
+        const isUnsavedNewRow = editingPatientFolderIndex === indexToRemove && !originalPatientFolderToEdit;
+        if (isUnsavedNewRow || !folderToRemove.name || !folderToRemove.name.trim()) {
+            const updatedFolders = patientFolders.filter((_, index) => index !== indexToRemove);
+            setPatientFolders(updatedFolders);
+            if (editingPatientFolderIndex === indexToRemove) {
+                setEditingPatientFolderIndex(null);
+                setOriginalPatientFolderToEdit(null);
+            }
+            return;
+        }
+        const targetName = (editingPatientFolderIndex === indexToRemove && originalPatientFolderToEdit?.name)
+            ? originalPatientFolderToEdit.name
+            : folderToRemove.name;
+        onAction(
+            `Você tem certeza que quer remover a pasta "${targetName}"?`,
+            async () => {
+                setPatientFoldersError('');
+                try {
+                    const url = `${apiBaseUrl}/google-driver-id/patient-folders`;
+                    const response = await fetch(url, {
+                        method: 'DELETE',
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ folder: { name: targetName, url: folderToRemove.url || '' } })
+                    });
+
+                    if (response.ok) {
+                        const updatedFolders = patientFolders.filter((_, index) => index !== indexToRemove);
+                        setPatientFolders(updatedFolders);
+                        if (editingPatientFolderIndex === indexToRemove) {
+                            setEditingPatientFolderIndex(null);
+                            setOriginalPatientFolderToEdit(null);
+                        }
+                    } else {
+                        const errorData = await response.json().catch(() => ({}));
+                        throw new Error(errorData.detail || `Erro ao remover pasta: Status ${response.status}`);
+                    }
+                } catch (error) {
+                    setPatientFoldersError(error.message || 'Falha ao remover pasta.');
+                }
+            }
+        );
     };
 
     const handleSaveSecrets = async () => {
@@ -1543,32 +1673,125 @@ export default function ClientConfigurations({ apiBaseUrl, token, onAction }) {
 
                 {/* --- TAB: GOOGLE DRIVER ID --- */}
                 {activeTab === 'googleDriverId' && (
-                    <div>
-                        <div className="flex justify-between items-center mb-4">
-                            <h3 className="text-xl font-semibold text-gray-700">Google Driver ID</h3>
+                    <div className="space-y-8">
+                        <div>
+                            <div className="flex justify-between items-center mb-4">
+                                <h3 className="text-xl font-semibold text-gray-700">Google Driver ID</h3>
+                                {!loadingGoogleDriverId && (
+                                    <div>
+                                        {!isEditingGoogleDriverId ? (
+                                            <button onClick={() => setIsEditingGoogleDriverId(true)} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 focus:outline-none">Editar</button>
+                                        ) : (
+                                            <button onClick={handleSaveGoogleDriverId} disabled={savingGoogleDriverId} className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 focus:outline-none">
+                                                {savingGoogleDriverId ? 'Salvando...' : 'Salvar'}
+                                            </button>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                            {loadingGoogleDriverId && <p className="text-blue-500">Carregando...</p>}
+                            {googleDriverIdError && <p className="text-red-500">{googleDriverIdError}</p>}
                             {!loadingGoogleDriverId && (
-                                <div>
-                                    {!isEditingGoogleDriverId ? (
-                                        <button onClick={() => setIsEditingGoogleDriverId(true)} className="px-4 py-2 bg-blue-600 text-white rounded">Editar</button>
-                                    ) : (
-                                        <button onClick={handleSaveGoogleDriverId} disabled={savingGoogleDriverId} className="px-4 py-2 bg-green-600 text-white rounded">
-                                            {savingGoogleDriverId ? 'Salvando...' : 'Salvar'}
-                                        </button>
-                                    )}
-                                </div>
+                                <input
+                                    type="text"
+                                    value={googleDriverId}
+                                    onChange={(e) => setGoogleDriverId(e.target.value)}
+                                    readOnly={!isEditingGoogleDriverId}
+                                    className={`w-full p-3 border rounded-md ${!isEditingGoogleDriverId ? 'bg-gray-100' : ''}`}
+                                    placeholder="Insira o ID da pasta do Google Drive"
+                                />
                             )}
                         </div>
-                        {loadingGoogleDriverId && <p className="text-blue-500">Carregando...</p>}
-                        {googleDriverIdError && <p className="text-red-500">{googleDriverIdError}</p>}
-                        {!loadingGoogleDriverId && (
-                            <input
-                                type="text"
-                                value={googleDriverId}
-                                onChange={(e) => setGoogleDriverId(e.target.value)}
-                                readOnly={!isEditingGoogleDriverId}
-                                className={`w-full p-3 border rounded-md ${!isEditingGoogleDriverId ? 'bg-gray-100' : ''}`}
-                                placeholder="Insira o ID da pasta do Google Drive"
-                            />
+
+                        {!loadingGoogleDriverId && enableGoogleCalendarScheduling && (
+                            <div className="border-t border-gray-200 pt-6">
+                                <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-4">
+                                    <h4 className="text-lg font-semibold text-gray-700">
+                                        Adicionar Pasta do Google Driver com Documentos a serem enviados ao paciente:
+                                    </h4>
+                                    <button
+                                        onClick={handleAddPatientFolder}
+                                        disabled={editingPatientFolderIndex !== null}
+                                        className={`px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 focus:outline-none whitespace-nowrap ${editingPatientFolderIndex !== null ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                    >
+                                        + Adicionar Pasta
+                                    </button>
+                                </div>
+
+                                {patientFoldersError && <p className="text-red-500 mb-4">{patientFoldersError}</p>}
+
+                                <div className="space-y-4">
+                                    {patientFolders.length === 0 && editingPatientFolderIndex === null && (
+                                        <p className="text-gray-500">Nenhuma pasta de documentos configurada.</p>
+                                    )}
+                                    {patientFolders.map((folder, index) => (
+                                        <div key={index} className="flex flex-col bg-white border border-gray-200 rounded-lg shadow-sm p-4 space-y-4">
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                <div>
+                                                    <label className="block text-sm font-medium text-gray-700 mb-1">Nome do Diretório</label>
+                                                    <input
+                                                        type="text"
+                                                        value={folder.name || ''}
+                                                        onChange={(e) => handlePatientFolderChange(index, 'name', e.target.value)}
+                                                        readOnly={editingPatientFolderIndex !== index}
+                                                        className={`w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 ${editingPatientFolderIndex !== index ? 'bg-gray-100' : ''}`}
+                                                        placeholder="Ex: Preparo Endoscopia"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-medium text-gray-700 mb-1">URL</label>
+                                                    <input
+                                                        type="text"
+                                                        value={folder.url || ''}
+                                                        onChange={(e) => handlePatientFolderChange(index, 'url', e.target.value)}
+                                                        readOnly={editingPatientFolderIndex !== index}
+                                                        className={`w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 ${editingPatientFolderIndex !== index ? 'bg-gray-100' : ''}`}
+                                                        placeholder="https://drive.google.com/drive/folders/..."
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div className="flex space-x-2 self-end mt-2">
+                                                {editingPatientFolderIndex === index ? (
+                                                    <>
+                                                        <button
+                                                            onClick={() => handleSavePatientFolder(index)}
+                                                            disabled={savingPatientFolderIndex === index}
+                                                            className={`px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 focus:outline-none ${savingPatientFolderIndex === index ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                                        >
+                                                            {savingPatientFolderIndex === index ? 'Salvando...' : 'Salvar'}
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleCancelEditPatientFolder(index)}
+                                                            disabled={savingPatientFolderIndex === index}
+                                                            className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 focus:outline-none"
+                                                        >
+                                                            Cancelar
+                                                        </button>
+                                                    </>
+                                                ) : (
+                                                    <button
+                                                        onClick={() => {
+                                                            setPatientFoldersError('');
+                                                            setEditingPatientFolderIndex(index);
+                                                            setOriginalPatientFolderToEdit({ name: folder.name, url: folder.url });
+                                                        }}
+                                                        disabled={editingPatientFolderIndex !== null}
+                                                        className={`px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 focus:outline-none ${editingPatientFolderIndex !== null ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                                    >
+                                                        Editar
+                                                    </button>
+                                                )}
+                                                <button
+                                                    onClick={() => handleRemovePatientFolder(index)}
+                                                    className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 focus:outline-none"
+                                                >
+                                                    Remover
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
                         )}
                     </div>
                 )}
