@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Calendar, dateFnsLocalizer } from 'react-big-calendar';
 import format from 'date-fns/format';
 import parse from 'date-fns/parse';
@@ -8,6 +8,7 @@ import ptBR from 'date-fns/locale/pt-BR';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 
 import CalendarEventModal from './CalendarEventModal.jsx';
+import { useRealtime, useRealtimeSubscription } from '../context/RealtimeContext.jsx';
 
 const locales = {
   'pt-BR': ptBR,
@@ -33,6 +34,8 @@ const colorPalette = [
     '#d53f8c', // pink-500
 ];
 
+const REALTIME_REFETCH_DEBOUNCE_MS = 400;
+
 export default function AdminCalendarView({ token, apiBaseUrl, currentUser }) {
     const [events, setEvents] = useState([]);
     const [doctors, setDoctors] = useState([]);
@@ -45,6 +48,17 @@ export default function AdminCalendarView({ token, apiBaseUrl, currentUser }) {
     // Modal state
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedEvent, setSelectedEvent] = useState(null);
+
+    const { connectionEpoch } = useRealtime();
+    const isFirstConnectRef = useRef(true);
+    const debounceTimeoutRef = useRef(null);
+
+    // Compute loaded time window [start, end] around currentDate
+    const loadedWindow = useMemo(() => {
+        const start = new Date(currentDate.getFullYear(), currentDate.getMonth() - 2, 1);
+        const end = new Date(currentDate.getFullYear(), currentDate.getMonth() + 2, 0);
+        return { start, end };
+    }, [currentDate]);
 
     // Fetch doctors (users with role 'Médico')
     const fetchDoctors = useCallback(async () => {
@@ -68,14 +82,14 @@ export default function AdminCalendarView({ token, apiBaseUrl, currentUser }) {
     }, [apiBaseUrl, token, currentUser]);
 
     // Fetch calendar events
-    const fetchEvents = useCallback(async () => {
-        setIsLoading(true);
+    const fetchEvents = useCallback(async ({ silent = false } = {}) => {
+        if (!silent) {
+            setIsLoading(true);
+        }
         setError(null);
         
-        // Let's fetch a wide range around the current date to ensure we have data.
-        // react-big-calendar handles the display filtering.
-        const start = new Date(currentDate.getFullYear(), currentDate.getMonth() - 2, 1).toISOString();
-        const end = new Date(currentDate.getFullYear(), currentDate.getMonth() + 2, 0).toISOString();
+        const start = loadedWindow.start.toISOString();
+        const end = loadedWindow.end.toISOString();
 
         try {
             const response = await fetch(`${apiBaseUrl}/calendar/events?time_min=${start}&time_max=${end}`, {
@@ -101,16 +115,75 @@ export default function AdminCalendarView({ token, apiBaseUrl, currentUser }) {
             
             setEvents(formattedEvents);
         } catch (err) {
-            setError(err.message);
+            if (!silent) {
+                setError(err.message);
+            } else {
+                console.error("Silent calendar refresh failed:", err);
+            }
         } finally {
-            setIsLoading(false);
+            if (!silent) {
+                setIsLoading(false);
+            }
         }
-    }, [apiBaseUrl, token, currentDate]);
+    }, [apiBaseUrl, token, loadedWindow]);
+
+    const scheduleSilentRefresh = useCallback(() => {
+        if (debounceTimeoutRef.current) {
+            clearTimeout(debounceTimeoutRef.current);
+        }
+        debounceTimeoutRef.current = setTimeout(() => {
+            fetchEvents({ silent: true });
+        }, REALTIME_REFETCH_DEBOUNCE_MS);
+    }, [fetchEvents]);
+
+    useEffect(() => {
+        return () => {
+            if (debounceTimeoutRef.current) {
+                clearTimeout(debounceTimeoutRef.current);
+            }
+        };
+    }, []);
 
     useEffect(() => {
         fetchDoctors();
         fetchEvents();
     }, [fetchDoctors, fetchEvents]);
+
+    // Real-time subscription: refresh immediately when an appointment is created/updated/deleted
+    useRealtimeSubscription('calendar_changed', (payload) => {
+        const info = payload?.data;
+        if (info?.start && info?.end) {
+            const eventStart = new Date(info.start);
+            const eventEnd = new Date(info.end);
+            if (!isNaN(eventStart) && !isNaN(eventEnd)) {
+                if (eventEnd < loadedWindow.start || eventStart > loadedWindow.end) {
+                    return; // Outside loaded range
+                }
+            }
+        }
+        scheduleSilentRefresh();
+    });
+
+    // Re-sync after a WebSocket drop & reconnect
+    useEffect(() => {
+        if (connectionEpoch === 0) return;
+        if (isFirstConnectRef.current) {
+            isFirstConnectRef.current = false;
+            return;
+        }
+        scheduleSilentRefresh();
+    }, [connectionEpoch, scheduleSilentRefresh]);
+
+    // Re-sync when browser tab becomes visible again
+    useEffect(() => {
+        const onVisibilityChange = () => {
+            if (document.visibilityState === 'visible') {
+                scheduleSilentRefresh();
+            }
+        };
+        document.addEventListener('visibilitychange', onVisibilityChange);
+        return () => document.removeEventListener('visibilitychange', onVisibilityChange);
+    }, [scheduleSilentRefresh]);
 
     // Map doctor_ids to a consistent color from the palette
     const doctorColorMap = useMemo(() => {
