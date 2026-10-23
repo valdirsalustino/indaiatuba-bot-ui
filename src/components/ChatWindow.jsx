@@ -9,7 +9,23 @@ const TakeOverIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" width="20" 
 const DownloadIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5 mr-2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg> );
 const PhoneIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6 text-gray-500 hover:text-green-500" title="Reabrir conversa"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg> );
 
-export default function ChatWindow({ conversation, onSendMessage, onEditMessage, onMarkAsSolved, onInitiateTransfer, onTakeOver, onReopenThread, currentUser, departments = [], isLatestThread = false, clientName = '', showTopics = false, showLeads = false }) {
+export default function ChatWindow({
+  conversation,
+  onSendMessage,
+  onEditMessage,
+  onMarkAsSolved,
+  onInitiateTransfer,
+  onTakeOver,
+  onReopenThread,
+  currentUser,
+  departments = [],
+  isLatestThread = false,
+  clientName = '',
+  showTopics = false,
+  showLeads = false,
+  onOpenScheduleModal,
+  onViewTraceability,
+}) {
   const [editingMessageId, setEditingMessageId] = useState(null); // wamid being edited
   const [editText, setEditText] = useState('');               // current text in the edit textarea
   const messagesEndRef = useRef(null);
@@ -73,6 +89,20 @@ export default function ChatWindow({ conversation, onSendMessage, onEditMessage,
             </div>
         </div>
         <div className="flex items-center space-x-3">
+            {['Admin', 'Secretaria'].includes(currentUser.role) && onOpenScheduleModal && (
+              <button
+                type="button"
+                onClick={() => onOpenScheduleModal(conversation)}
+                title="Agendar consulta a partir desta conversa"
+                className="flex items-center px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-full shadow-sm transition-colors gap-1"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                Agendar
+              </button>
+            )}
+
             {conversation.status === 'open' ? (
               <>
                 <span className="bg-green-100 text-green-700 text-xs font-semibold px-2.5 py-1 rounded-full whitespace-nowrap">Em andamento</span>
@@ -129,6 +159,30 @@ export default function ChatWindow({ conversation, onSendMessage, onEditMessage,
             )}
         </div>
       </header>
+
+      {/* --- Scheduled Appointments Banner --- */}
+      {conversation?.scheduled_appointments && conversation.scheduled_appointments.length > 0 && (
+        <div className="bg-emerald-50 border-b border-emerald-200 px-4 py-2.5 flex items-center justify-between text-xs text-emerald-950 border-l-4 border-emerald-500 shadow-sm">
+          <div className="flex items-center gap-2">
+            <svg className="w-4 h-4 text-emerald-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+            <span>
+              <strong>Consulta Agendada:</strong> {conversation.scheduled_appointments[0].client_name || 'Paciente'} &bull; {conversation.scheduled_appointments[0].doctor_name || conversation.scheduled_appointments[0].doctor_username}
+              {conversation.scheduled_appointments[0].start_time && ` (${new Date(conversation.scheduled_appointments[0].start_time).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })})`}
+            </span>
+          </div>
+          {onViewTraceability && (
+            <button
+              type="button"
+              onClick={() => onViewTraceability(conversation.scheduled_appointments[0].appointment_id || conversation.scheduled_appointments[0].event_id)}
+              className="inline-flex items-center gap-1 font-semibold text-emerald-700 hover:text-emerald-900 hover:underline ml-3 whitespace-nowrap"
+            >
+              Ver Rastreabilidade &rarr;
+            </button>
+          )}
+        </div>
+      )}
 
       {/* --- Explainability Banner --- */}
       {conversation && ((showTopics && conversation.topic) || (showLeads && conversation.lead)) && (

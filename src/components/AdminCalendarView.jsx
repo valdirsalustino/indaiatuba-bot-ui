@@ -36,7 +36,7 @@ const colorPalette = [
 
 const REALTIME_REFETCH_DEBOUNCE_MS = 400;
 
-export default function AdminCalendarView({ token, apiBaseUrl, currentUser }) {
+export default function AdminCalendarView({ token, apiBaseUrl, currentUser, onOpenTraceability }) {
     const [events, setEvents] = useState([]);
     const [doctors, setDoctors] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
@@ -105,6 +105,9 @@ export default function AdminCalendarView({ token, apiBaseUrl, currentUser }) {
             // Map to react-big-calendar format
             const formattedEvents = data.map(e => ({
                 id: e.id,
+                appointment_id: e.appointment_id || e.id,
+                origin_type: e.origin_type,
+                traceability_url: e.traceability_url,
                 title: e.summary,
                 description: e.description,
                 start: new Date(e.start),
@@ -355,6 +358,7 @@ export default function AdminCalendarView({ token, apiBaseUrl, currentUser }) {
                 onDelete={handleDeleteEvent}
                 event={selectedEvent}
                 doctors={doctors}
+                onViewTraceability={onOpenTraceability}
             />
         </div>
     );

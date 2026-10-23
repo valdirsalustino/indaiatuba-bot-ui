@@ -15,6 +15,8 @@ import OAuthCallback from './components/OAuthCallback.jsx';
 import AdminCalendarView from './components/AdminCalendarView.jsx';
 import TopNavbar from './components/TopNavbar.jsx';
 import NewConversationModal from './components/NewConversationModal.jsx';
+import AppointmentDetailsModal from './components/AppointmentDetailsModal.jsx';
+import CalendarEventModal from './components/CalendarEventModal.jsx';
 import { useToast } from './context/ToastContext.jsx';
 import { RealtimeProvider } from './context/RealtimeContext.jsx';
 import { useConversationRealtime } from './hooks/useConversationRealtime.js';
@@ -121,6 +123,13 @@ function App() {
     message: '',
     onConfirm: () => {},
   });
+
+  // Traceability & Scheduling states
+  const [traceabilityAppointmentId, setTraceabilityAppointmentId] = useState(null);
+  const [isTraceabilityModalOpen, setIsTraceabilityModalOpen] = useState(false);
+  const [scheduleModalState, setScheduleModalState] = useState({ isOpen: false, initialOrigin: null });
+  const [doctors, setDoctors] = useState([]);
+
 
   const handleLogout = useCallback(() => {
     localStorage.removeItem('admin_token');
@@ -424,11 +433,77 @@ function App() {
     if(user){
         setToken(newToken);
         setCurrentUser(user);
-        setActiveView('conversations');
+        const returnTo = sessionStorage.getItem('returnTo');
+        if (returnTo && returnTo.startsWith('/') && !returnTo.startsWith('//')) {
+            sessionStorage.removeItem('returnTo');
+            window.history.replaceState(null, '', returnTo);
+            const apptMatch = returnTo.match(/^\/appointments\/([^/?#]+)/);
+            if (apptMatch) {
+              setTraceabilityAppointmentId(apptMatch[1]);
+              setIsTraceabilityModalOpen(true);
+            }
+            const convMatch = returnTo.match(/^\/conversations\/([^/?#]+)/);
+            if (convMatch) {
+              loadAndSelectConversation(decodeURIComponent(convMatch[1]));
+            }
+            setActiveView('conversations');
+        } else {
+            setActiveView('conversations');
+        }
     } else {
         handleLogout();
     }
   };
+
+  // Fetch doctors for scheduling
+  useEffect(() => {
+    if (!token) return;
+    authFetch(`${apiBaseUrl}/users`)
+      .then(res => res.ok ? res.json() : [])
+      .then(users => {
+        if (Array.isArray(users)) {
+          setDoctors(users.filter(u => u.role === 'Médico'));
+        }
+      })
+      .catch(err => console.error("Error fetching doctors:", err));
+  }, [token, apiBaseUrl, authFetch]);
+
+  // Direct URL deep-link handling
+  useEffect(() => {
+    if (!token || !currentUser) return;
+    const pathname = window.location.pathname;
+    const apptMatch = pathname.match(/^\/appointments\/([^/?#]+)/);
+    if (apptMatch) {
+      setTraceabilityAppointmentId(apptMatch[1]);
+      setIsTraceabilityModalOpen(true);
+    }
+    const convMatch = pathname.match(/^\/conversations\/([^/?#]+)/);
+    if (convMatch) {
+      loadAndSelectConversation(decodeURIComponent(convMatch[1]));
+    }
+  }, [token, currentUser]);
+
+  const handleSaveAppointmentFromChat = async (eventData) => {
+    try {
+      const res = await authFetch(`${apiBaseUrl}/calendar/events`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(eventData),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || 'Falha ao agendar consulta.');
+      }
+      addToast('Consulta agendada com sucesso!', 'success');
+      setScheduleModalState({ isOpen: false, initialOrigin: null });
+      if (selectedConversation?.composite_id) {
+        loadAndSelectConversation(selectedConversation.composite_id);
+      }
+    } catch (err) {
+      addToast(err.message, 'error');
+    }
+  };
+
 
   const handleSelectConversation = (conversation) => {
     setSelectedConversation(conversation);
@@ -639,6 +714,9 @@ function App() {
   }
 
   if (!token || !currentUser) {
+    if (window.location.pathname.startsWith('/appointments/') || window.location.pathname.startsWith('/conversations/')) {
+      sessionStorage.setItem('returnTo', window.location.pathname + window.location.search);
+    }
     return (
       <Routes>
         <Route path="/calendar/callback" element={<OAuthCallback apiBaseUrl={apiBaseUrl} token={null} />} />
@@ -738,6 +816,19 @@ function App() {
                       clientName={clientName}
                       showTopics={showTopics}
                       showLeads={showLeads}
+                      onOpenScheduleModal={(conv) => {
+                        setScheduleModalState({
+                          isOpen: true,
+                          initialOrigin: {
+                            composite_id: conv.composite_id,
+                            client_name: conv.user_name || ''
+                          }
+                        });
+                      }}
+                      onViewTraceability={(appointmentId) => {
+                        setTraceabilityAppointmentId(appointmentId);
+                        setIsTraceabilityModalOpen(true);
+                      }}
                   />
               )}
 
@@ -781,6 +872,10 @@ function App() {
                       currentUser={currentUser}
                       apiBaseUrl={apiBaseUrl}
                       token={token}
+                      onOpenTraceability={(appointmentId) => {
+                        setTraceabilityAppointmentId(appointmentId);
+                        setIsTraceabilityModalOpen(true);
+                      }}
                   />
               )}
 
@@ -798,6 +893,34 @@ function App() {
                   return { exists: false };
                 }}
                 isSubmitting={isSubmittingNewConversation}
+              />
+
+              <AppointmentDetailsModal
+                isOpen={isTraceabilityModalOpen}
+                onClose={() => {
+                  setIsTraceabilityModalOpen(false);
+                  setTraceabilityAppointmentId(null);
+                  if (window.location.pathname.startsWith('/appointments/')) {
+                    window.history.replaceState(null, '', '/');
+                  }
+                }}
+                appointmentId={traceabilityAppointmentId}
+                apiBaseUrl={apiBaseUrl}
+                token={token}
+                onOpenConversation={(compositeId) => {
+                  setIsTraceabilityModalOpen(false);
+                  setTraceabilityAppointmentId(null);
+                  loadAndSelectConversation(compositeId);
+                }}
+                addToast={addToast}
+              />
+
+              <CalendarEventModal
+                isOpen={scheduleModalState.isOpen}
+                onClose={() => setScheduleModalState({ isOpen: false, initialOrigin: null })}
+                onSave={handleSaveAppointmentFromChat}
+                doctors={doctors}
+                initialOrigin={scheduleModalState.initialOrigin}
               />
             </div>
           </div>
