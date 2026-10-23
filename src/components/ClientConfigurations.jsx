@@ -34,6 +34,16 @@ export default function ClientConfigurations({ apiBaseUrl, token, onAction }) {
     const [isEditingLeadPrompt, setIsEditingLeadPrompt] = useState(false);
     const [savingLeadPrompt, setSavingLeadPrompt] = useState(false);
 
+    // --- Automated Appointment Confirmation State ---
+    const defaultConfirmationConfig = {
+        enabled: false,
+        send_time: '09:00',
+        message_template: 'Olá, {patient_name}! Passando para confirmar seu exame/consulta ({exam_summary}) agendado para {exam_date} às {exam_time} no Indaiatuba Day Hospital.\n\nVocê confirma sua presença? Caso precise remarcar ou cancelar, basta me responder por aqui.',
+        whatsapp_template_name: 'confirmacao_agendamento'
+    };
+    const [confirmationConfig, setConfirmationConfig] = useState(defaultConfirmationConfig);
+    const [originalConfirmationConfig, setOriginalConfirmationConfig] = useState(defaultConfirmationConfig);
+
 
     // --- Topics States ---
     const [topics, setTopics] = useState([]);
@@ -240,6 +250,17 @@ export default function ClientConfigurations({ apiBaseUrl, token, onAction }) {
                         throw new Error(errorData.detail || `Erro ao carregar tópicos: Status ${topicsRes.status}`);
                     } else {
                         setTopics([]);
+                    }
+
+                    try {
+                        const confRes = await fetch(`${apiBaseUrl}/confirmation-config`, { method: 'GET', headers });
+                        if (confRes.ok) {
+                            const confData = await confRes.json();
+                            setConfirmationConfig(confData);
+                            setOriginalConfirmationConfig(confData);
+                        }
+                    } catch (err) {
+                        console.error("Erro ao carregar confirmation-config:", err);
                     }
                 } catch (error) {
                     setClientPromptError(error.message || 'Falha ao conectar com o servidor.');
@@ -530,6 +551,21 @@ export default function ClientConfigurations({ apiBaseUrl, token, onAction }) {
                     throw new Error(errorData.detail || `Erro ao salvar template do whatsapp: Status ${wResponse.status}`);
                 }
                 setOriginalWhatsappTemplate(whatsappTemplate);
+            }
+
+            if (JSON.stringify(confirmationConfig) !== JSON.stringify(originalConfirmationConfig)) {
+                const confUrl = `${apiBaseUrl}/confirmation-config`;
+                const confResponse = await fetch(confUrl, {
+                    method: 'PUT',
+                    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify(confirmationConfig)
+                });
+
+                if (!confResponse.ok) {
+                    const errorData = await confResponse.json().catch(() => ({}));
+                    throw new Error(errorData.detail || `Erro ao salvar configuração de confirmação: Status ${confResponse.status}`);
+                }
+                setOriginalConfirmationConfig(confirmationConfig);
             }
 
             // Lead Classification and Topics logic...
@@ -1173,6 +1209,77 @@ export default function ClientConfigurations({ apiBaseUrl, token, onAction }) {
                                         Habilitar Agendamento de Consultas (Google Calendar)
                                     </label>
                                 </div>
+
+                                {enableGoogleCalendarScheduling && (
+                                    <div className="p-4 bg-sky-50/50 border border-sky-200 rounded-lg space-y-4">
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center space-x-2">
+                                                <input
+                                                    type="checkbox"
+                                                    id="confirmationEnabled"
+                                                    checked={confirmationConfig.enabled}
+                                                    onChange={(e) => setConfirmationConfig({ ...confirmationConfig, enabled: e.target.checked })}
+                                                    disabled={!isEditingClientPrompt}
+                                                    className="h-4 w-4 text-sky-600 border-gray-300 rounded focus:ring-sky-500 disabled:opacity-50"
+                                                />
+                                                <label htmlFor="confirmationEnabled" className={`text-sm font-semibold text-sky-950 ${!isEditingClientPrompt ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
+                                                    Confirmação Automática de Agendamentos no WhatsApp
+                                                </label>
+                                            </div>
+                                            <span className="text-xs text-sky-700 bg-sky-100 px-2 py-0.5 rounded font-medium">
+                                                D-1 (Sexta p/ Seg, Sáb e Dom)
+                                            </span>
+                                        </div>
+                                        <p className="text-xs text-gray-600">
+                                            Dispara mensagens proativas no dia anterior ao exame/consulta em uma thread dedicada (<code className="bg-sky-100 px-1 py-0.5 rounded text-sky-800">role=confirmation</code>). Às sextas-feiras, confirma os agendamentos de sábado, domingo e segunda-feira.
+                                        </p>
+
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="block text-xs font-semibold text-gray-700 mb-1">
+                                                    Horário de Disparo (Horário de Brasília)
+                                                </label>
+                                                <input
+                                                    type="time"
+                                                    value={confirmationConfig.send_time || '09:00'}
+                                                    onChange={(e) => setConfirmationConfig({ ...confirmationConfig, send_time: e.target.value })}
+                                                    readOnly={!isEditingClientPrompt}
+                                                    className={`w-full p-2 border border-gray-300 rounded text-sm ${!isEditingClientPrompt ? 'bg-gray-100' : 'bg-white'}`}
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-semibold text-gray-700 mb-1">
+                                                    Nome do Template Meta (Opcional)
+                                                </label>
+                                                <input
+                                                    type="text"
+                                                    value={confirmationConfig.whatsapp_template_name || ''}
+                                                    onChange={(e) => setConfirmationConfig({ ...confirmationConfig, whatsapp_template_name: e.target.value })}
+                                                    readOnly={!isEditingClientPrompt}
+                                                    placeholder="confirmacao_agendamento"
+                                                    className={`w-full p-2 border border-gray-300 rounded text-sm ${!isEditingClientPrompt ? 'bg-gray-100' : 'bg-white'}`}
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-xs font-semibold text-gray-700 mb-1">
+                                                Modelo da Mensagem
+                                                <span className="text-gray-400 font-normal ml-1">
+                                                    (Placeholders: &#123;patient_name&#125;, &#123;exam_summary&#125;, &#123;exam_date&#125;, &#123;exam_time&#125;)
+                                                </span>
+                                            </label>
+                                            <textarea
+                                                value={confirmationConfig.message_template || ''}
+                                                onChange={(e) => setConfirmationConfig({ ...confirmationConfig, message_template: e.target.value })}
+                                                readOnly={!isEditingClientPrompt}
+                                                rows={4}
+                                                className={`w-full p-2.5 border border-gray-300 rounded text-xs leading-relaxed resize-y ${!isEditingClientPrompt ? 'bg-gray-100' : 'bg-white'}`}
+                                                placeholder="Olá, {patient_name}! Passando para confirmar seu exame..."
+                                            />
+                                        </div>
+                                    </div>
+                                )}
 
                                 <div className="flex items-center space-x-2 pt-2">
                                     <input

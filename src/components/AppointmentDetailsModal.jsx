@@ -19,6 +19,18 @@ export default function AppointmentDetailsModal({
     const [inputCompositeId, setInputCompositeId] = useState('');
     const [submittingLink, setSubmittingLink] = useState(false);
 
+    // Status Action States
+    const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+    const [showCancelPrompt, setShowCancelPrompt] = useState(false);
+    const [cancelReason, setCancelReason] = useState('');
+
+    // Additional Conversation Link States
+    const [isLinkingConv, setIsLinkingConv] = useState(false);
+    const [newLinkCompositeId, setNewLinkCompositeId] = useState('');
+    const [newLinkRole, setNewLinkRole] = useState('confirmation');
+    const [newLinkNotes, setNewLinkNotes] = useState('');
+    const [submittingConvLink, setSubmittingConvLink] = useState(false);
+
     const fetchDetails = async () => {
         if (!appointmentId || !token) return;
         setLoading(true);
@@ -46,6 +58,8 @@ export default function AppointmentDetailsModal({
         if (isOpen && appointmentId) {
             fetchDetails();
             setIsLinking(false);
+            setIsLinkingConv(false);
+            setShowCancelPrompt(false);
         } else {
             setData(null);
             setError(null);
@@ -56,6 +70,97 @@ export default function AppointmentDetailsModal({
 
     const appt = data?.appointment;
     const audits = data?.audit_trail || [];
+
+    const handleConfirmStatus = async () => {
+        setIsUpdatingStatus(true);
+        try {
+            const res = await fetch(`${apiBaseUrl}/appointments/${appointmentId}/status`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    status: 'confirmed',
+                    note: 'Presença confirmada manualmente pela equipe'
+                })
+            });
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                throw new Error(err.detail || 'Erro ao confirmar presença.');
+            }
+            if (addToast) addToast('Presença confirmada com sucesso!', 'success');
+            await fetchDetails();
+        } catch (err) {
+            if (addToast) addToast(err.message, 'error');
+        } finally {
+            setIsUpdatingStatus(false);
+        }
+    };
+
+    const handleCancelStatus = async (e) => {
+        if (e) e.preventDefault();
+        setIsUpdatingStatus(true);
+        try {
+            const res = await fetch(`${apiBaseUrl}/appointments/${appointmentId}/status`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    status: 'cancelled',
+                    cancellation_reason: cancelReason.trim() || 'Cancelado pela equipe',
+                    note: `Cancelado pela equipe: ${cancelReason.trim() || 'Sem motivo informado'}`
+                })
+            });
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                throw new Error(err.detail || 'Erro ao cancelar agendamento.');
+            }
+            if (addToast) addToast('Agendamento cancelado com sucesso!', 'success');
+            setShowCancelPrompt(false);
+            setCancelReason('');
+            await fetchDetails();
+        } catch (err) {
+            if (addToast) addToast(err.message, 'error');
+        } finally {
+            setIsUpdatingStatus(false);
+        }
+    };
+
+    const handleSaveConversationLink = async (e) => {
+        e.preventDefault();
+        setSubmittingConvLink(true);
+        try {
+            const payload = {
+                composite_id: newLinkCompositeId.trim(),
+                role: newLinkRole,
+                notes: newLinkNotes.trim() || null
+            };
+            const res = await fetch(`${apiBaseUrl}/appointments/${appointmentId}/conversations`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify(payload)
+            });
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                throw new Error(err.detail || 'Erro ao vincular conversa.');
+            }
+            if (addToast) addToast('Conversa vinculada com sucesso!', 'success');
+            setIsLinkingConv(false);
+            setNewLinkCompositeId('');
+            setNewLinkNotes('');
+            await fetchDetails();
+        } catch (err) {
+            if (addToast) addToast(err.message, 'error');
+        } finally {
+            setSubmittingConvLink(false);
+        }
+    };
 
     const handleCopyLink = () => {
         const link = `${window.location.origin}/appointments/${appointmentId}`;
@@ -172,15 +277,18 @@ export default function AppointmentDetailsModal({
 
                     {!loading && !error && appt && (
                         <>
-                            {/* Summary Card */}
-                            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 rounded-xl p-4">
-                                <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                            {/* Summary Card with Status and Quick Actions */}
+                            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 rounded-xl p-4 space-y-3">
+                                <div className="flex flex-wrap items-center justify-between gap-2">
                                     <h4 className="text-base font-semibold text-blue-900">{appt.summary}</h4>
-                                    <span className={`text-xs px-2.5 py-1 rounded-full font-semibold uppercase tracking-wider ${
-                                        appt.status === 'confirmed' ? 'bg-green-100 text-green-800' :
-                                        appt.status === 'cancelled' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'
+                                    <span className={`text-xs px-2.5 py-1 rounded-full font-semibold uppercase tracking-wider flex items-center gap-1 ${
+                                        appt.status === 'confirmed' ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' :
+                                        appt.status === 'cancelled' ? 'bg-rose-100 text-rose-800 border border-rose-300' :
+                                        'bg-amber-100 text-amber-800 border border-amber-300'
                                     }`}>
-                                        {appt.status === 'confirmed' ? 'Confirmado' : appt.status === 'cancelled' ? 'Cancelado' : 'Pendente'}
+                                        {appt.status === 'confirmed' && <span>✓ Confirmado</span>}
+                                        {appt.status === 'booked' && <span>• Agendado (Aguardando Confirmação)</span>}
+                                        {appt.status === 'cancelled' && <span>✕ Cancelado</span>}
                                     </span>
                                 </div>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-gray-600">
@@ -190,7 +298,75 @@ export default function AppointmentDetailsModal({
                                     <div>
                                         <span className="font-semibold text-gray-700">Data/Hora:</span> {formatDateTime(appt.start)} até {formatDateTime(appt.end)}
                                     </div>
+                                    {appt.confirmed_at && (
+                                        <div className="text-[11px] text-emerald-700">
+                                            <span className="font-semibold">Confirmado em:</span> {formatDateTime(appt.confirmed_at)} ({appt.confirmed_by?.display || appt.confirmed_by?.id || 'Bot'})
+                                        </div>
+                                    )}
+                                    {appt.cancelled_at && (
+                                        <div className="text-[11px] text-rose-700">
+                                            <span className="font-semibold">Cancelado em:</span> {formatDateTime(appt.cancelled_at)}: {appt.cancellation_reason || 'Sem motivo'}
+                                        </div>
+                                    )}
                                 </div>
+
+                                {/* Quick Actions */}
+                                {appt.status !== 'cancelled' && (
+                                    <div className="pt-2 border-t border-blue-200/60 flex flex-wrap items-center gap-2">
+                                        {appt.status === 'booked' && (
+                                            <button
+                                                type="button"
+                                                disabled={isUpdatingStatus}
+                                                onClick={handleConfirmStatus}
+                                                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg shadow-sm transition-colors disabled:opacity-50"
+                                            >
+                                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                                                </svg>
+                                                Confirmar Presença Manualmente
+                                            </button>
+                                        )}
+
+                                        {!showCancelPrompt ? (
+                                            <button
+                                                type="button"
+                                                disabled={isUpdatingStatus}
+                                                onClick={() => setShowCancelPrompt(true)}
+                                                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-rose-50 text-rose-700 border border-rose-300 text-xs font-semibold rounded-lg transition-colors disabled:opacity-50"
+                                            >
+                                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                                                </svg>
+                                                Cancelar Agendamento
+                                            </button>
+                                        ) : (
+                                            <form onSubmit={handleCancelStatus} className="w-full flex items-center gap-2 mt-1">
+                                                <input
+                                                    type="text"
+                                                    placeholder="Motivo do cancelamento (ex: Paciente desmarcou)..."
+                                                    value={cancelReason}
+                                                    onChange={(e) => setCancelReason(e.target.value)}
+                                                    required
+                                                    className="flex-1 text-xs border border-rose-300 rounded px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-rose-500"
+                                                />
+                                                <button
+                                                    type="submit"
+                                                    disabled={isUpdatingStatus}
+                                                    className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold rounded shadow-sm disabled:opacity-50"
+                                                >
+                                                    {isUpdatingStatus ? 'Cancelando...' : 'Confirmar Cancelamento'}
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setShowCancelPrompt(false)}
+                                                    className="px-2 py-1.5 text-xs text-gray-500 hover:text-gray-700 rounded"
+                                                >
+                                                    Fechar
+                                                </button>
+                                            </form>
+                                        )}
+                                    </div>
+                                )}
                             </div>
 
                             {/* Origin & Responsibility Card */}
@@ -376,6 +552,158 @@ export default function AppointmentDetailsModal({
                                                 className="px-3 py-1 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded font-medium disabled:opacity-50"
                                             >
                                                 {submittingLink ? 'Salvando...' : 'Salvar'}
+                                            </button>
+                                        </div>
+                                    </form>
+                                )}
+                            </div>
+
+                            {/* Linked Conversations Card */}
+                            <div className="border border-gray-200 rounded-xl p-4 bg-white shadow-sm space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <h4 className="font-semibold text-gray-800 text-sm flex items-center gap-2">
+                                        <svg className="w-4 h-4 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                                        </svg>
+                                        Conversas Vinculadas no WhatsApp
+                                        <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full font-normal">
+                                            {(data?.conversations || []).length}
+                                        </span>
+                                    </h4>
+                                    {!isLinkingConv && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsLinkingConv(true)}
+                                            className="text-xs text-blue-600 hover:text-blue-800 font-medium hover:underline flex items-center gap-1"
+                                        >
+                                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+                                            </svg>
+                                            Vincular Outra Conversa
+                                        </button>
+                                    )}
+                                </div>
+
+                                {(!data?.conversations || data.conversations.length === 0) ? (
+                                    <p className="text-xs text-gray-400 italic">Nenhuma conversa de WhatsApp vinculada a este agendamento.</p>
+                                ) : (
+                                    <div className="space-y-2.5">
+                                        {data.conversations.map((conv, idx) => {
+                                            const roleLabels = {
+                                                origin: { label: 'Origem / Triagem', color: 'bg-blue-100 text-blue-800' },
+                                                confirmation: { label: 'Confirmação de Presença', color: 'bg-emerald-100 text-emerald-800' },
+                                                reschedule: { label: 'Remarcação', color: 'bg-amber-100 text-amber-800' },
+                                                cancellation: { label: 'Cancelamento', color: 'bg-rose-100 text-rose-800' },
+                                            };
+                                            const roleInfo = roleLabels[conv.role] || { label: conv.role, color: 'bg-gray-100 text-gray-800' };
+
+                                            return (
+                                                <div key={idx} className="p-3 bg-gray-50 border border-gray-100 rounded-lg flex flex-wrap items-center justify-between gap-3 text-xs">
+                                                    <div className="space-y-1">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className={`px-2 py-0.5 rounded font-semibold text-[11px] ${roleInfo.color}`}>
+                                                                {roleInfo.label}
+                                                            </span>
+                                                            <span className="font-semibold text-gray-800">
+                                                                {conv.phone_number}
+                                                            </span>
+                                                            <span className="text-gray-400">
+                                                                (Thread: {conv.thread_id})
+                                                            </span>
+                                                        </div>
+                                                        {conv.notes && (
+                                                            <p className="text-gray-500 text-[11px] pl-0.5">
+                                                                {conv.notes}
+                                                            </p>
+                                                        )}
+                                                        <p className="text-[10px] text-gray-400 pl-0.5">
+                                                            Vinculada em {formatDateTime(conv.linked_at)}
+                                                        </p>
+                                                    </div>
+
+                                                    <div>
+                                                        {conv.can_view ? (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    onClose();
+                                                                    if (onOpenConversation) {
+                                                                        onOpenConversation(conv.composite_id);
+                                                                    }
+                                                                }}
+                                                                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg shadow-sm transition-colors text-xs whitespace-nowrap"
+                                                            >
+                                                                Abrir Conversa &rarr;
+                                                            </button>
+                                                        ) : (
+                                                            <span className="inline-flex items-center gap-1 text-gray-400 text-[11px] italic" title="Acesso restrito ao médico responsável">
+                                                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                                                </svg>
+                                                                Acesso restrito
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+
+                                {/* Form to link another conversation */}
+                                {isLinkingConv && (
+                                    <form onSubmit={handleSaveConversationLink} className="mt-3 p-3 bg-blue-50/50 rounded-lg border border-blue-200 space-y-3">
+                                        <p className="text-xs font-semibold text-blue-900">Vincular Conversa Adicional</p>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                                            <div>
+                                                <label className="block text-xs font-medium text-gray-600 mb-1">ID da Conversa (ex: 551999999999:thread_1)</label>
+                                                <input
+                                                    type="text"
+                                                    placeholder="551999999999:thread_1"
+                                                    value={newLinkCompositeId}
+                                                    onChange={(e) => setNewLinkCompositeId(e.target.value)}
+                                                    required
+                                                    className="w-full text-xs border rounded px-2.5 py-1.5 bg-white"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-medium text-gray-600 mb-1">Papel da Conversa</label>
+                                                <select
+                                                    value={newLinkRole}
+                                                    onChange={(e) => setNewLinkRole(e.target.value)}
+                                                    className="w-full text-xs border rounded px-2.5 py-1.5 bg-white"
+                                                >
+                                                    <option value="confirmation">Confirmação de Presença</option>
+                                                    <option value="reschedule">Remarcação</option>
+                                                    <option value="cancellation">Cancelamento</option>
+                                                    <option value="origin">Origem / Triagem</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-medium text-gray-600 mb-1">Observações (opcional)</label>
+                                            <input
+                                                type="text"
+                                                placeholder="Ex: Paciente solicitou remarcação neste canal"
+                                                value={newLinkNotes}
+                                                onChange={(e) => setNewLinkNotes(e.target.value)}
+                                                className="w-full text-xs border rounded px-2.5 py-1.5 bg-white"
+                                            />
+                                        </div>
+                                        <div className="flex justify-end gap-2 pt-1">
+                                            <button
+                                                type="button"
+                                                onClick={() => setIsLinkingConv(false)}
+                                                className="px-2.5 py-1 text-xs text-gray-600 hover:bg-gray-200 rounded"
+                                            >
+                                                Cancelar
+                                            </button>
+                                            <button
+                                                type="submit"
+                                                disabled={submittingConvLink}
+                                                className="px-3 py-1 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded font-medium disabled:opacity-50"
+                                            >
+                                                {submittingConvLink ? 'Vinculando...' : 'Vincular Conversa'}
                                             </button>
                                         </div>
                                     </form>

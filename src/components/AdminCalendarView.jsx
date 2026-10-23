@@ -36,6 +36,32 @@ const colorPalette = [
 
 const REALTIME_REFETCH_DEBOUNCE_MS = 400;
 
+function CalendarEventComponent({ event }) {
+    const isConfirmed = event.status === 'confirmed';
+    const isCancelled = event.status === 'cancelled';
+
+    return (
+        <div className="flex items-center space-x-1 overflow-hidden text-xs py-0.5" title={`${event.title} (${event.status || 'booked'})`}>
+            {isConfirmed && (
+                <span className="inline-flex items-center justify-center bg-emerald-500 text-white rounded-full w-3.5 h-3.5 flex-shrink-0 text-[10px] font-bold" title="Confirmado">
+                    ✓
+                </span>
+            )}
+            {event.status === 'booked' && (
+                <span className="inline-block w-2 h-2 rounded-full bg-blue-300 flex-shrink-0" title="Agendado"></span>
+            )}
+            {isCancelled && (
+                <span className="inline-flex items-center justify-center bg-rose-500 text-white rounded-full w-3.5 h-3.5 flex-shrink-0 text-[10px] font-bold" title="Cancelado">
+                    ✕
+                </span>
+            )}
+            <span className={`truncate font-medium ${isCancelled ? 'line-through opacity-75' : ''}`}>
+                {event.title}
+            </span>
+        </div>
+    );
+}
+
 export default function AdminCalendarView({ token, apiBaseUrl, currentUser, onOpenTraceability }) {
     const [events, setEvents] = useState([]);
     const [doctors, setDoctors] = useState([]);
@@ -113,7 +139,8 @@ export default function AdminCalendarView({ token, apiBaseUrl, currentUser, onOp
                 start: new Date(e.start),
                 end: new Date(e.end),
                 resourceId: e.doctor_id,
-                provider: e.provider
+                provider: e.provider,
+                status: e.status || 'booked',
             }));
             
             setEvents(formattedEvents);
@@ -198,15 +225,33 @@ export default function AdminCalendarView({ token, apiBaseUrl, currentUser, onOp
     }, [doctors]);
 
     const eventStyleGetter = (event) => {
-        const backgroundColor = doctorColorMap[event.resourceId] || '#cbd5e0'; // fallback gray
+        const backgroundColor = doctorColorMap[event.resourceId] || '#4b5563';
+        const isConfirmed = event.status === 'confirmed';
+        const isCancelled = event.status === 'cancelled';
+
+        let border = '1px solid rgba(255, 255, 255, 0.25)';
+        let boxShadow = 'none';
+        let opacity = 0.95;
+
+        if (isConfirmed) {
+            border = '2px solid #10b981';
+            boxShadow = '0 0 0 1px #10b981';
+            opacity = 1;
+        } else if (isCancelled) {
+            border = '1px dashed #ef4444';
+            opacity = 0.55;
+        }
+
         return {
             style: {
                 backgroundColor,
-                borderRadius: '4px',
-                opacity: 0.9,
+                borderRadius: '6px',
+                opacity,
                 color: 'white',
-                border: '0px',
-                display: 'block'
+                border,
+                boxShadow,
+                display: 'block',
+                padding: '1px 3px',
             }
         };
     };
@@ -299,19 +344,37 @@ export default function AdminCalendarView({ token, apiBaseUrl, currentUser, onOp
                     <p className="text-sm text-gray-500 mt-1">Gerencie agendamentos de todos os médicos.</p>
                 </div>
                 
-                {/* Doctor Legend */}
-                <div className="flex flex-wrap gap-3 items-center">
-                    <span className="text-xs text-gray-400 uppercase font-bold tracking-wider mr-2">Médicos:</span>
-                    {doctors.map(doc => (
-                        <div key={doc.username} className="flex items-center space-x-1">
-                            <span 
-                                className="w-3 h-3 rounded-full" 
-                                style={{ backgroundColor: doctorColorMap[doc.username] }}
-                            ></span>
-                            <span className="text-sm text-gray-600">{doc.name || doc.username}</span>
+                {/* Doctor & Status Legend */}
+                <div className="flex flex-wrap gap-4 items-center">
+                    <div className="flex flex-wrap gap-3 items-center">
+                        <span className="text-xs text-gray-400 uppercase font-bold tracking-wider mr-1">Médicos:</span>
+                        {doctors.map(doc => (
+                            <div key={doc.username} className="flex items-center space-x-1">
+                                <span 
+                                    className="w-3 h-3 rounded-full" 
+                                    style={{ backgroundColor: doctorColorMap[doc.username] }}
+                                ></span>
+                                <span className="text-sm text-gray-600">{doc.name || doc.username}</span>
+                            </div>
+                        ))}
+                        {doctors.length === 0 && <span className="text-sm text-gray-400 italic">Nenhum médico encontrado</span>}
+                    </div>
+
+                    <div className="flex items-center space-x-3 text-xs text-gray-600 pl-4 border-l border-gray-200">
+                        <span className="text-xs text-gray-400 uppercase font-bold tracking-wider">Status:</span>
+                        <div className="flex items-center space-x-1">
+                            <span className="w-2 h-2 rounded-full bg-blue-400"></span>
+                            <span>Agendado</span>
                         </div>
-                    ))}
-                    {doctors.length === 0 && <span className="text-sm text-gray-400 italic">Nenhum médico encontrado</span>}
+                        <div className="flex items-center space-x-1">
+                            <span className="inline-flex items-center justify-center bg-emerald-500 text-white rounded-full w-3.5 h-3.5 text-[9px] font-bold">✓</span>
+                            <span className="text-emerald-700 font-medium">Confirmado</span>
+                        </div>
+                        <div className="flex items-center space-x-1">
+                            <span className="inline-flex items-center justify-center bg-rose-500 text-white rounded-full w-3.5 h-3.5 text-[9px] font-bold">✕</span>
+                            <span className="text-gray-500 line-through">Cancelado</span>
+                        </div>
+                    </div>
                 </div>
             </header>
 
@@ -345,6 +408,7 @@ export default function AdminCalendarView({ token, apiBaseUrl, currentUser, onOp
                     onSelectEvent={handleSelectEvent}
                     onNavigate={(newDate) => setCurrentDate(newDate)}
                     eventPropGetter={eventStyleGetter}
+                    components={{ event: CalendarEventComponent }}
                     views={['month', 'week', 'day', 'agenda']}
                     defaultView="week"
                     popup
