@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useRealtime, useRealtimeSubscription } from '../context/RealtimeContext.jsx';
+import { inferContentTypeFromUrl } from '../utils/mediaUtils.js';
 
 const LIFECYCLE_EVENTS = [
     'new_handoff_request',
@@ -125,26 +126,17 @@ export function useConversationRealtime({
             });
             if (isDuplicate) return prevConversations;
 
-            let contentType = 'text';
-            if (data.data.media_url) {
-                const url = data.data.media_url.toLowerCase();
-                const cleanUrl = decodeURIComponent(url.split('?')[0]);
-
-                const imageRegex = /\.(jpg|jpeg|png|gif|webp)($|[;\s%])/;
-                const videoRegex = /\.(mp4|mov|avi|webm)($|[;\s%])/;
-                const audioRegex = /\.(mp3|wav|ogg|opus)($|[;\s%])/;
-
-                if (imageRegex.test(cleanUrl)) contentType = 'image';
-                else if (videoRegex.test(cleanUrl)) contentType = 'video';
-                else if (audioRegex.test(cleanUrl)) contentType = 'audio';
-                else contentType = 'document';
-            }
+            const contentType = data.data.media_url
+                ? inferContentTypeFromUrl(data.data.media_url)
+                : 'text';
 
             const newMessage = {
                 text: data.data.text,
                 sender: data.data.sender,
                 timestamp: data.data.timestamp,
                 media_url: data.data.media_url,
+                download_url: data.data.download_url || data.data.media_url,
+                filename: data.data.filename,
                 content_type: contentType,
                 message_id: data.data.message_id,
                 is_edited: data.data.is_edited,

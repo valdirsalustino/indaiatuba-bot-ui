@@ -1,23 +1,98 @@
 import React from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { getMediaDownloadUrl, getMediaFilename, getMediaTypeMeta } from '../utils/mediaUtils.js';
 
 const PencilIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg> );
-const DownloadIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5 mr-2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg> );
+const DownloadIcon = ({ className = "h-4 w-4 mr-1.5 flex-shrink-0" }) => ( <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg> );
 const CheckIcon = ({ className }) => ( <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polyline points="20 6 9 17 4 12"></polyline></svg> );
 const CheckCheckIcon = ({ className, strokeWidth = "2" }) => ( <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M18 6 7 17l-5-5"/><path d="m22 10-7.5 7.5L13 16"/></svg> );
 const AlertIcon = ({ className }) => ( <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg> );
 
-const MediaRenderer = ({ msg }) => {
+const MediaRenderer = ({ msg, isAdminMessage }) => {
+    const downloadUrl = getMediaDownloadUrl(msg);
+    const filename = getMediaFilename(msg);
+    const { buttonLabel } = getMediaTypeMeta(msg.content_type);
+    const btnThemeClass = isAdminMessage
+        ? 'bg-indigo-500/80 hover:bg-indigo-500 text-white border border-indigo-400/50'
+        : 'bg-gray-200 hover:bg-gray-300 text-gray-800';
+
     switch (msg.content_type) {
         case 'image':
-            return <img src={msg.media_url} alt="User upload" className="rounded-lg max-w-xs lg:max-w-md" />;
+            return (
+                <a
+                    href={downloadUrl}
+                    download={filename}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title={`Clique para baixar (${filename})`}
+                    className="group/media relative inline-flex flex-col items-start rounded-lg overflow-hidden cursor-pointer"
+                >
+                    <div className="relative">
+                        <img
+                            src={msg.media_url}
+                            alt={filename}
+                            className="rounded-lg max-w-xs lg:max-w-md block transition-opacity group-hover/media:opacity-90"
+                        />
+                        <span className="absolute bottom-2 right-2 inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-black/70 text-white opacity-80 group-hover/media:opacity-100 transition-opacity shadow-sm">
+                            <DownloadIcon className="h-3.5 w-3.5 mr-1" />
+                            {buttonLabel}
+                        </span>
+                    </div>
+                </a>
+            );
         case 'video':
-            return ( <video controls src={msg.media_url} className="rounded-lg max-w-xs lg:max-w-md"> Your browser does not support the video tag. </video> );
+            return (
+                <div className="flex flex-col items-start gap-1.5">
+                    <video controls src={msg.media_url} className="rounded-lg max-w-xs lg:max-w-md">
+                        Your browser does not support the video tag.
+                    </video>
+                    <a
+                        href={downloadUrl}
+                        download={filename}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title={`Baixar ${filename}`}
+                        className={`inline-flex items-center text-xs font-semibold py-1.5 px-3 rounded-lg transition-colors ${btnThemeClass}`}
+                    >
+                        <DownloadIcon />
+                        {buttonLabel}
+                    </a>
+                </div>
+            );
         case 'audio':
-            return ( <audio controls src={msg.media_url} className="mt-2" style={{ minWidth: '250px' }}> Your browser does not support the audio element. </audio> );
+            return (
+                <div className="flex flex-col items-start gap-1.5 mt-1">
+                    <audio controls src={msg.media_url} style={{ minWidth: '250px' }}>
+                        Your browser does not support the audio element.
+                    </audio>
+                    <a
+                        href={downloadUrl}
+                        download={filename}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title={`Baixar ${filename}`}
+                        className={`inline-flex items-center text-xs font-semibold py-1.5 px-3 rounded-lg transition-colors ${btnThemeClass}`}
+                    >
+                        <DownloadIcon />
+                        {buttonLabel}
+                    </a>
+                </div>
+            );
         case 'document':
-            return ( <a href={msg.media_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-2 px-4 rounded-lg"> <DownloadIcon /> Baixar Documento </a> );
+            return (
+                <a
+                    href={downloadUrl}
+                    download={filename}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title={`Baixar ${filename}`}
+                    className={`inline-flex items-center font-semibold py-2 px-4 rounded-lg transition-colors ${btnThemeClass}`}
+                >
+                    <DownloadIcon className="h-5 w-5 mr-2 flex-shrink-0" />
+                    <span>{buttonLabel}</span>
+                </a>
+            );
         default:
             return null;
     }
@@ -103,7 +178,7 @@ export default function MessageBubble({
                 {senderName && ( <span className={`text-[11px] font-medium text-gray-500 mb-1 ${nameAlignment} px-1`}>{senderName}</span> )}
                 <div className={`${theme.borderRadius} px-4 py-2 ${theme.bgColor} ${theme.textColor} relative group-hover:shadow-md transition-shadow`}>
                     <div className="flex flex-col">
-                        {msg.media_url && <MediaRenderer msg={msg} />}
+                        {msg.media_url && <MediaRenderer msg={msg} isAdminMessage={isAdminMessage} />}
                         {isBeingEdited ? (
                             <div className="flex flex-col gap-2 mt-1">
                                 <textarea
