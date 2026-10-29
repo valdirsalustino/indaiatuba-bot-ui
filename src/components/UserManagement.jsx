@@ -90,67 +90,195 @@ const WorkingHoursEditor = ({ workingHours, onChange }) => {
   );
 };
 
+const getInitialSpecialties = (user) => {
+  if (Array.isArray(user?.specialties) && user.specialties.length > 0) {
+    return user.specialties.map((s) => ({
+      name: s?.name || '',
+      price: s?.price !== null && s?.price !== undefined ? s.price : '',
+    }));
+  }
+  if (user?.specialty && String(user.specialty).trim()) {
+    const parts = String(user.specialty)
+      .split(',')
+      .map((p) => p.trim())
+      .filter(Boolean);
+    if (parts.length > 0) {
+      return parts.map((part, idx) => ({
+        name: part,
+        price:
+          idx === 0 &&
+          user?.consultation_price !== null &&
+          user?.consultation_price !== undefined
+            ? user.consultation_price
+            : '',
+      }));
+    }
+  }
+  return [{ name: '', price: '' }];
+};
+
+const sanitizeSpecialtiesForPayload = (specialties) => {
+  if (!Array.isArray(specialties)) return [];
+  return specialties
+    .map((s) => {
+      const name = String(s?.name || '').trim();
+      const rawPrice = s?.price;
+      const parsedPrice =
+        rawPrice === '' || rawPrice === null || rawPrice === undefined
+          ? null
+          : parseFloat(rawPrice);
+      return {
+        name,
+        price: parsedPrice !== null && !Number.isNaN(parsedPrice) ? parsedPrice : null,
+      };
+    })
+    .filter((s) => s.name.length > 0);
+};
+
 const ProfessionalDetailsEditor = ({ userDetails, onChange }) => {
+  const specialties =
+    Array.isArray(userDetails?.specialties) && userDetails.specialties.length > 0
+      ? userDetails.specialties
+      : getInitialSpecialties(userDetails);
+
+  const handleSpecialtyChange = (index, field, value) => {
+    const updated = specialties.map((item, idx) =>
+      idx === index ? { ...item, [field]: value } : item
+    );
+    onChange({ ...userDetails, specialties: updated });
+  };
+
+  const handleAddSpecialtyRow = () => {
+    onChange({
+      ...userDetails,
+      specialties: [...specialties, { name: '', price: '' }],
+    });
+  };
+
+  const handleRemoveSpecialtyRow = (index) => {
+    if (specialties.length <= 1) {
+      onChange({ ...userDetails, specialties: [{ name: '', price: '' }] });
+      return;
+    }
+    const updated = specialties.filter((_, idx) => idx !== index);
+    onChange({ ...userDetails, specialties: updated });
+  };
+
   return (
     <div className="p-4 bg-gray-50 border rounded-md mb-4">
       <h4 className="font-semibold text-gray-700 mb-3">Informações Profissionais</h4>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-y-4 gap-x-6">
-        <div>
-            <label className="block text-sm font-medium text-gray-700">Especialidade</label>
-            <input 
-                type="text" 
-                value={userDetails?.specialty || ''}
-                onChange={(e) => onChange({ ...userDetails, specialty: e.target.value })}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm px-2 py-1 border"
-                placeholder="Ex: Ortopedista e Cirurgião"
-            />
+
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-3 mb-4">
+        <div className="md:col-span-4">
+          <label className="block text-sm font-medium text-gray-700">Tipo de Registro</label>
+          <input
+            type="text"
+            value={userDetails?.professional_id?.description || ''}
+            onChange={(e) =>
+              onChange({
+                ...userDetails,
+                professional_id: {
+                  ...(userDetails?.professional_id || {}),
+                  description: e.target.value,
+                },
+              })
+            }
+            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm px-2 py-1 border"
+            placeholder="Ex: CRM"
+          />
         </div>
-        <div className="flex space-x-2">
-            <div className="w-1/3">
-                <label className="block text-sm font-medium text-gray-700">Tipo de Registro</label>
-                <input 
-                    type="text" 
-                    value={userDetails?.professional_id?.description || ''}
-                    onChange={(e) => onChange({ ...userDetails, professional_id: { ...(userDetails?.professional_id || {}), description: e.target.value } })}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm px-2 py-1 border"
-                    placeholder="Ex: CRM"
-                />
-            </div>
-            <div className="w-2/3">
-                <label className="block text-sm font-medium text-gray-700">Número do Registro</label>
-                <input 
-                    type="text" 
-                    value={userDetails?.professional_id?.value || ''}
-                    onChange={(e) => onChange({ ...userDetails, professional_id: { ...(userDetails?.professional_id || {}), value: e.target.value } })}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm px-2 py-1 border"
-                    placeholder="Ex: 12345-SP"
-                />
-            </div>
+        <div className="md:col-span-8">
+          <label className="block text-sm font-medium text-gray-700">Número do Registro</label>
+          <input
+            type="text"
+            value={userDetails?.professional_id?.value || ''}
+            onChange={(e) =>
+              onChange({
+                ...userDetails,
+                professional_id: {
+                  ...(userDetails?.professional_id || {}),
+                  value: e.target.value,
+                },
+              })
+            }
+            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm px-2 py-1 border"
+            placeholder="Ex: 12345-SP"
+          />
         </div>
-        <div className="mt-4">
-            <label className="block text-sm font-medium text-gray-700">Preço da Consulta (Particular)</label>
-            <div className="relative mt-1 rounded-md shadow-sm">
-                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+      </div>
+
+      <div className="border-t border-gray-200 pt-3">
+        <div className="flex items-center justify-between mb-2">
+          <label className="block text-sm font-semibold text-gray-700">
+            Especialidades e Preço da Consulta (Particular)
+          </label>
+          <button
+            type="button"
+            onClick={handleAddSpecialtyRow}
+            className="text-xs font-semibold text-blue-600 hover:text-blue-800 px-2.5 py-1 rounded border border-blue-300 hover:bg-blue-50 transition-colors"
+          >
+            + Adicionar Especialidade
+          </button>
+        </div>
+
+        <div className="space-y-2">
+          {specialties.map((spec, index) => (
+            <div key={index} className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
+              <div className="md:col-span-6">
+                {index === 0 && (
+                  <label className="block text-xs font-medium text-gray-600 mb-1">
+                    Especialidade
+                  </label>
+                )}
+                <input
+                  type="text"
+                  value={spec.name || ''}
+                  onChange={(e) => handleSpecialtyChange(index, 'name', e.target.value)}
+                  className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm px-2 py-1 border"
+                  placeholder="Ex: Endoscopia"
+                />
+              </div>
+
+              <div className="md:col-span-5">
+                {index === 0 && (
+                  <label className="block text-xs font-medium text-gray-600 mb-1">
+                    Preço da Consulta (Particular)
+                  </label>
+                )}
+                <div className="relative rounded-md shadow-sm">
+                  <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
                     <span className="text-gray-500 sm:text-sm">R$</span>
-                </div>
-                <input 
-                    type="number" 
+                  </div>
+                  <input
+                    type="number"
                     step="0.01"
                     min="0"
-                    value={userDetails?.consultation_price || ''}
-                    onChange={(e) => {
-                        const val = e.target.value;
-                        onChange({ ...userDetails, consultation_price: val === '' ? null : parseFloat(val) });
-                    }}
+                    value={spec.price === null || spec.price === undefined ? '' : spec.price}
+                    onChange={(e) => handleSpecialtyChange(index, 'price', e.target.value)}
                     className="block w-full rounded-md border-gray-300 pl-10 focus:border-blue-500 focus:ring-blue-500 sm:text-sm px-2 py-1 border"
-                    placeholder="Ex: 350.00"
-                />
+                    placeholder="Ex: 850.00"
+                  />
+                </div>
+              </div>
+
+              <div className="md:col-span-1 flex justify-end pb-1">
+                <button
+                  type="button"
+                  onClick={() => handleRemoveSpecialtyRow(index)}
+                  className="text-red-500 hover:text-red-700 p-1"
+                  title="Remover Especialidade"
+                >
+                  <TrashIcon />
+                </button>
+              </div>
             </div>
+          ))}
         </div>
       </div>
     </div>
   );
 };
+
 export default function UserManagement({ token, apiBaseUrl, onAction, currentUser, departments = [] }) {
   const [message, setMessage] = useState('');
   const [isError, setIsError] = useState(false);
@@ -162,9 +290,8 @@ export default function UserManagement({ token, apiBaseUrl, onAction, currentUse
     name: '', 
     role: '', 
     working_hours: getDefaultWorkingHours(),
-    specialty: '',
+    specialties: [{ name: '', price: '' }],
     professional_id: { description: '', value: '' },
-    consultation_price: null
   });
   const [editingDetailsFor, setEditingDetailsFor] = useState(null);
   const [editingDetails, setEditingDetails] = useState(null);
@@ -207,10 +334,12 @@ export default function UserManagement({ token, apiBaseUrl, onAction, currentUse
       const payload = { ...newUser };
       if (payload.role !== 'Médico') {
           delete payload.working_hours;
+          delete payload.specialties;
           delete payload.specialty;
           delete payload.professional_id;
           delete payload.consultation_price;
       } else {
+          payload.specialties = sanitizeSpecialtiesForPayload(payload.specialties);
           if (!payload.professional_id?.description && !payload.professional_id?.value) {
               delete payload.professional_id;
           }
@@ -235,9 +364,8 @@ export default function UserManagement({ token, apiBaseUrl, onAction, currentUse
         name: '', 
         role: '', 
         working_hours: getDefaultWorkingHours(),
-        specialty: '',
+        specialties: [{ name: '', price: '' }],
         professional_id: { description: '', value: '' },
-        consultation_price: null
       });
       fetchUsers(); // Refresh the user list
     } catch (err) {
@@ -360,9 +488,8 @@ export default function UserManagement({ token, apiBaseUrl, onAction, currentUse
                                               } else {
                                                   setEditingDetails({
                                                       working_hours: user.working_hours || getDefaultWorkingHours(),
-                                                      specialty: user.specialty || '',
+                                                      specialties: getInitialSpecialties(user),
                                                       professional_id: user.professional_id || { description: '', value: '' },
-                                                      consultation_price: user.consultation_price || null
                                                   });
                                                   setEditingDetailsFor(user.username);
                                               }
@@ -405,7 +532,10 @@ export default function UserManagement({ token, apiBaseUrl, onAction, currentUse
                                           </button>
                                           <button 
                                               onClick={() => {
-                                                  const updatePayload = { ...editingDetails };
+                                                  const updatePayload = {
+                                                      ...editingDetails,
+                                                      specialties: sanitizeSpecialtiesForPayload(editingDetails.specialties),
+                                                  };
                                                   if (!updatePayload.professional_id?.description && !updatePayload.professional_id?.value) {
                                                       updatePayload.professional_id = null;
                                                   }
